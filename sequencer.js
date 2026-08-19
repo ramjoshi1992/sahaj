@@ -69,16 +69,26 @@
    * each one barely longer than its own seed opening and ending, and a
    * 10-minute session wants fewer boundaries, not more. Two of three also
    * means six ordered pairs, so the variety goes up rather than down. */
-  function familyOrder(g, rand, targetS) {
+  function familyOrder(g, rand, targetS, avoid) {
     const fams = ['A', 'B', 'C'].filter(f => g.families[f] && g.families[f].seed);
     const room = Math.floor(targetS / MIN_MOVEMENT);
     const n = Math.max(1, Math.min(fams.length, room));
-    return shuffled(fams, rand).slice(0, n);
+    let order = shuffled(fams, rand);
+
+    /* A reroll has to be audibly different, and every plan opens with a seed
+     * track from its beginning — so with three families, one reroll in three
+     * would start with byte-identical audio to the one just rejected. Moving
+     * that family out of first place is what makes the button mean anything. */
+    if (avoid && order[0] === avoid && order.length > 1) {
+      const j = 1 + Math.floor(rand() * (order.length - 1));
+      [order[0], order[j]] = [order[j], order[0]];
+    }
+    return order.slice(0, n);
   }
 
   /* Build the item list for one pass at a given target length. Crossfades
    * eat wall-clock time, so the caller runs this twice and rescales. */
-  function pass(g, order, targetS, rand) {
+  function pass(g, order, targetS, rand, warmStart) {
     const pools = {};
     let poolTotal = 0;
     order.forEach(f => { pools[f] = g.families[f].pool; poolTotal += pools[f]; });
@@ -107,8 +117,17 @@
         used[m] = 0;
       });
 
+      /* A fresh session opens at bar one, because that is the seed's composed
+       * opening. A reroll starts partway in instead: sleep seeds in particular
+       * are quiet and sparse for their first fifteen seconds, so beginning at
+       * zero means the change you asked for is inaudible until it is too late
+       * to feel like a change. */
+      const warm = warmStart && fi === 0;
+      const openEntry = warm
+        ? round1(Math.min(Math.max(0, sd.usableEnd - openLen - 4), 32))
+        : 0;
       items.push({ family: fam, stem: seedName, role: 'opening',
-                   entry: 0, len: openLen });
+                   entry: openEntry, len: openLen });
 
       let lastOfCycle = null;
       for (let c = 0; c < cycles; c++) {
@@ -160,13 +179,13 @@
     const target = minutes * 60;
     const xf = g.crossfade || 2.5;
 
-    const order = familyOrder(g, rand, target);
+    const order = familyOrder(g, rand, target, opts.avoid);
 
     // two passes: build, measure the shortfall the joins cost, rebuild
-    let items = pass(g, order, target, rng(seedNum));
+    let items = pass(g, order, target, rng(seedNum), opts.warmStart);
     let dur = layout(items, xf);
     if (dur > 0) {
-      items = pass(g, order, target * (target / dur), rng(seedNum));
+      items = pass(g, order, target * (target / dur), rng(seedNum), opts.warmStart);
       dur = layout(items, xf);
     }
 
