@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05070D">
+<title>About — sahaj</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,200..500&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#F4F1E9;--dim:rgba(244,241,233,.56);--faint:rgba(244,241,233,.30);
+  --rule:rgba(244,241,233,.14);
+  --serif:'Newsreader',Georgia,serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:#05070D;color:var(--ink);font-family:var(--serif);
+  -webkit-font-smoothing:antialiased;transition:background 3s linear;min-height:100vh}
+#stars{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+#stars i{position:absolute;border-radius:50%;background:#FFFDF6;transform:translate(-50%,-50%)}
+@media (prefers-reduced-motion:no-preference){
+  #stars i{animation:tw var(--p) ease-in-out infinite alternate;
+           animation-delay:calc(var(--d) * -1s)}
+  @keyframes tw{from{opacity:var(--lo)}to{opacity:var(--hi)}}}
+#vignette{position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:radial-gradient(120% 70% at 50% 0%,transparent 45%,rgba(0,0,0,.34) 100%)}
+main{position:relative;z-index:2;max-width:560px;margin:0 auto;
+  padding:calc(env(safe-area-inset-top,0px) + 54px) 30px
+          calc(env(safe-area-inset-bottom,0px) + 80px)}
+.back{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--faint);text-decoration:none;border-bottom:1px solid var(--rule);
+  padding-bottom:3px}
+h1{font-size:31px;font-weight:200;letter-spacing:-.01em;margin:44px 0 8px}
+.stand{font-size:17px;line-height:1.62;font-weight:300;color:var(--dim);margin:0 0 46px}
+h2{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--faint);font-weight:400;margin:44px 0 16px}
+p{font-size:16px;line-height:1.72;font-weight:300;margin:0 0 18px}
+p.small{font-size:14px;line-height:1.7;color:var(--dim)}
+em{font-style:normal;color:var(--ink)}
+a{color:var(--ink)}
+ul{padding-left:0;list-style:none;margin:0}
+li{font-size:14px;line-height:1.75;color:var(--dim);margin-bottom:11px}
+li b{font-weight:400;color:var(--ink)}
+hr{border:0;border-top:1px solid var(--rule);margin:44px 0}
+.credit{font-family:var(--mono);font-size:11.5px;line-height:1.85;color:var(--faint);
+  word-break:break-word}
+.credit a{color:var(--dim)}
+</style>
+</head>
+<body>
+<div id="stars"></div><div id="vignette"></div>
+<main>
+  <a class="back" href="index.html">← back</a>
+
+  <h1>About</h1>
+  <p class="stand">sahaj plays one continuous piece of music, put together
+    while you listen, for the hour you opened it and the weather where you are.</p>
+
+  <h2>The name</h2>
+  <p><em>Sahaj</em> is Sanskrit for effortless — natural, unforced, the way
+    something is when it isn't being made to happen. The word comes from
+    <em>saha</em>, together, and <em>ja</em>, born: born along with you, rather
+    than acquired.</p>
+  <p>That is the whole intention. You say one thing — what you want — and
+    everything else is worked out for you. There is nothing to configure and
+    nothing to choose from. It should take no effort at all.</p>
+
+  <h2>What it does</h2>
+  <p>You say what you want — to settle, to sleep, to shut out the noise — and
+    how long you have. Everything after that is worked out for you.</p>
+  <p>The time of day and the weather decide which version of that mood you get.
+    Morning under a clear sky gives you something brighter than the same mood at
+    nine in the evening, or in the rain. Underneath the music there's usually a
+    quiet layer of somewhere — rain outside, birds, a fire — chosen to suit where
+    you are, and you can change it or turn it off at any point.</p>
+  <p>The background is the real sky. Not a picture of one: the colours are
+    worked out from where the sun actually is above you, so a session that starts
+    at sunset genuinely darkens while it plays. On a clear night the stars are
+    the ones that are really up there, in the positions they're really in.</p>
+
+  <h2>How the music was made</h2>
+  <p>Every mood began with a written description — the instruments, the feel,
+    how the energy should rise and fall — and three of those descriptions per
+    mood, deliberately different from each other, were turned into music by an
+    AI model. Those three pieces became the seeds.</p>
+  <p>Each seed was then used to grow a small family of related pieces: variations
+    that share its key, its tempo and its character without being the same music.
+    Twelve pieces per mood, per time of day. A little over two hundred and fifty
+    altogether.</p>
+  <p>A session is built from those families. It opens with a seed, moves through
+    that family's variations, and closes with the seed again — then does the same
+    with the next family. Because everything inside a family is closely related,
+    you never hear a join. The only real changes are the two or three moments
+    where one family hands over to another, and those are given a breath of
+    near-silence so they feel like a section ending rather than a seam.</p>
+  <p>The order is different every time. Which family opens, which closes, which
+    variation follows which, where each one is entered — all of it is decided
+    fresh. Two sessions of the same mood, the same length, on the same evening
+    won't be the same piece.</p>
+
+  <h2>Why it isn't a playlist</h2>
+  <p>Nothing here exists as a finished track. There's no file to skip to and no
+    recording to find somewhere else. The music is assembled in your browser as
+    it plays, which is why it can be exactly as long as you asked for and end
+    properly rather than fading out mid-phrase.</p>
+
+  <h2>What it doesn't do</h2>
+  <p class="small">No advertising. Nothing is sold to anyone. If you use it
+    without an account — which is the default — nothing about you leaves your
+    device at all. If you make one, it stores what you listened to and how it
+    landed, and nothing else: no location, no identifying details.</p>
+
+  <hr>
+
+  <h2>Sound credits</h2>
+  <p class="small">The background layers are Creative Commons recordings from
+    Freesound, from people who made them freely available. Most are public
+    domain; these three ask to be credited, and gladly:</p>
+  <div class="credit" id="credits">
+    “Atlantic Ocean Waves” by tim.kahn
+    (<a href="https://freesound.org/people/tim.kahn/sounds/197714/">197714</a>)
+    licensed under CC-BY<br>
+    “Forest Ambient LOOP” by Imjeax
+    (<a href="https://freesound.org/people/Imjeax/sounds/427400/">427400</a>)
+    licensed under CC-BY<br>
+    “Calm Suburban Street” by kevp888
+    (<a href="https://freesound.org/people/kevp888/sounds/639133/">639133</a>)
+    licensed under CC-BY
+  </div>
+  <p class="small" style="margin-top:16px">Weather from
+    <a href="https://open-meteo.com/">Open-Meteo</a>. Place names from
+    <a href="https://www.openstreetmap.org/">OpenStreetMap</a>.</p>
+
+  <h2>Get in touch</h2>
+  <p class="small">Something sounded wrong, something didn't work, or you have a
+    thought about it — <a href="mailto:ramjoshi1992@gmail.com">ramjoshi1992@gmail.com</a>.
+    Written and built by Ram Joshi.</p>
+
+  <p class="small" style="margin-top:38px;color:var(--faint)">
+    sahaj is the newer of two things. Its predecessor, ZenTune, is still
+    <a href="https://ramjoshi1992.github.io/ZenTune/">here</a>.</p>
+</main>
+
+<script src="sky.js"></script>
+<script>
+/* Same sky as the app, so About doesn't feel like a different product. */
+(function(){
+  const lon = -new Date().getTimezoneOffset()/4;
+  const ctx = {lat:51.5, lon:Math.max(-180,Math.min(180,lon))};
+  function paint(){
+    const s = SahajSky.sky({lat:ctx.lat, lon:ctx.lon, date:new Date()});
+    document.body.style.background = s.css;
+    const r=document.documentElement.style;
+    r.setProperty('--ink',s.ink); r.setProperty('--dim',s.dim);
+    r.setProperty('--faint',s.faint); r.setProperty('--rule',s.rule);
+    document.querySelector('meta[name=theme-color]').setAttribute('content',s.stops[0]);
+    const layer=document.getElementById('stars'); layer.innerHTML='';
+    SahajSky.stars({lat:ctx.lat, lon:ctx.lon, date:new Date(), place:'suburban'})
+      .forEach(st=>{
+        const i=document.createElement('i');
+        i.style.left=(st.x*100)+'%'; i.style.top=(st.y*100)+'%';
+        i.style.width=st.size+'px'; i.style.height=st.size+'px';
+        i.style.setProperty('--hi',st.opacity);
+        i.style.setProperty('--lo',Math.max(0,st.opacity*(1-st.twinkle)).toFixed(3));
+        i.style.setProperty('--p',st.period+'s');
+        i.style.setProperty('--d',(st.phase*st.period).toFixed(2));
+        layer.appendChild(i);
+      });
+  }
+  paint(); setInterval(paint,60000);
+
+  /* If library.json carries credit lines, they win — the page should never
+     drift from what is actually playing. */
+  fetch('library.json').then(r=>r.json()).then(lib=>{
+    const files=(lib._textures&&lib._textures.files)||{};
+    const lines=Object.values(files)
+      .filter(f=>f.credit && !/zero/i.test(f.license||''))
+      .map(f=>f.credit);
+    if(lines.length) document.getElementById('credits').innerHTML=lines.join('<br>');
+  }).catch(()=>{});
+})();
+</script>
+</body>
+</html>
