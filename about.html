@@ -132,7 +132,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:44px 0}
 
   <h2>Get in touch</h2>
   <p class="small">Something sounded wrong, something didn't work, or you have a
-    thought about it — <a href="mailto:ramjoshi1992@gmail.com">ramjoshi1992@gmail.com</a>.
+    thought about it — <a href="mailto:hello@example.com">hello@example.com</a>.
     Written and built by Ram Joshi.</p>
 
   <p class="small" style="margin-top:38px;color:var(--faint)">
@@ -144,8 +144,27 @@ hr{border:0;border-top:1px solid var(--rule);margin:44px 0}
 <script>
 /* Same sky as the app, so About doesn't feel like a different product. */
 (function(){
-  const lon = -new Date().getTimezoneOffset()/4;
-  const ctx = {lat:51.5, lon:Math.max(-180,Math.min(180,lon))};
+  /* The same sky as the app, over the same place. The app remembers where you
+     are once geolocation has resolved; without that this page was drawing a
+     default point, so the stars sat somewhere else entirely. */
+  function remembered(){
+    try{
+      const p=JSON.parse(localStorage.getItem('sahaj.pos')||'null');
+      if(p && typeof p.lat==='number') return p;
+    }catch(e){}
+    const lon = -new Date().getTimezoneOffset()/4;
+    return {lat:51.5, lon:Math.max(-180,Math.min(180,lon))};
+  }
+  function place(){
+    try{
+      for(const k in localStorage){
+        if(k.indexOf('sahaj.env.')===0) return JSON.parse(localStorage.getItem(k));
+      }
+    }catch(e){}
+    return 'suburban';
+  }
+  const ctx = remembered();
+  const where = place();
   function paint(){
     const s = SahajSky.sky({lat:ctx.lat, lon:ctx.lon, date:new Date()});
     document.body.style.background = s.css;
@@ -154,7 +173,7 @@ hr{border:0;border-top:1px solid var(--rule);margin:44px 0}
     r.setProperty('--faint',s.faint); r.setProperty('--rule',s.rule);
     document.querySelector('meta[name=theme-color]').setAttribute('content',s.stops[0]);
     const layer=document.getElementById('stars'); layer.innerHTML='';
-    SahajSky.stars({lat:ctx.lat, lon:ctx.lon, date:new Date(), place:'suburban'})
+    SahajSky.stars({lat:ctx.lat, lon:ctx.lon, date:new Date(), place:where})
       .forEach(st=>{
         const i=document.createElement('i');
         i.style.left=(st.x*100)+'%'; i.style.top=(st.y*100)+'%';
