@@ -240,6 +240,12 @@ body{
 <script src="engine.js"></script>
 <script>
 'use strict';
+/* Which build is actually running. Type sahajBuild in the console — if it is
+ * not the one you just uploaded, the browser or the host is serving a cached
+ * copy and nothing you changed is live. */
+const BUILD = '2026-08-20a';
+window.sahajBuild = BUILD;
+console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
 
 /* The seven destinations. The phrase is what the person says; the word is what
