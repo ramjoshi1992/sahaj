@@ -22,7 +22,9 @@ body{
   -webkit-font-smoothing:antialiased;overflow:hidden;
   transition:background 3s linear;
 }
-#stars{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+#stars{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0;
+  opacity:0;transition:opacity 2.4s ease}
+#stars.lit{opacity:1}
 #stars i{position:absolute;border-radius:50%;background:#FFFDF6;transform:translate(-50%,-50%)}
 @media (prefers-reduced-motion:no-preference){
   #stars i{animation:tw var(--p) ease-in-out infinite alternate;
@@ -299,6 +301,7 @@ function paintSky(){
 }
 function paintStars(){
   const layer=$('stars'); layer.innerHTML='';
+  requestAnimationFrame(()=>layer.classList.add('lit'));
   const st = SahajSky.stars({lat:CTX.lat, lon:CTX.lon, date:new Date(),
                             cloud:CTX.cloud, place:CTX.place});
   st.forEach(s=>{
@@ -317,8 +320,11 @@ function paintStars(){
 
 // ── where and what the weather is ───────────────────────────
 function guessPosition(){
-  // no permission: longitude follows from the clock's offset, latitude is a
-  // guess. The sky will be close enough; nothing else depends on it.
+  // Somewhere to start before anything has resolved. A remembered position is
+  // exact; failing that, longitude follows from the clock's offset and the
+  // latitude is a guess. Nothing but the sky depends on it.
+  const last = store.get('pos');
+  if(last) return {lat:last.lat, lon:last.lon, guessed:false, remembered:true};
   const lon = -new Date().getTimezoneOffset()/4;
   return {lat:51.5, lon:Math.max(-180,Math.min(180,lon)), guessed:true};
 }
@@ -408,17 +414,29 @@ function suggestTexture(w,place){
 // ── boot ────────────────────────────────────────────────────
 (async function boot(){
   show('s-landing');
-  try{ LIB = await (await fetch('library.json')).json(); }
-  catch(e){ LIB=null; }
+
+  /* The sky is painted before anything is awaited. Waiting on the library and
+   * on geolocation put it two or three seconds behind the page, which is long
+   * enough to look like a fault rather than a night arriving. */
+  const first = guessPosition();
+  CTX.lat=first.lat; CTX.lon=first.lon; CTX.guessed=first.guessed;
+  CTX.cloud=0; CTX.precip=0;
+  paintSky();
+
+  const libP = fetch('library.json').then(r=>r.json())
+                 .then(j=>{ LIB=j; }).catch(()=>{ LIB=null; });
 
   const p = await position();
+  const moved = Math.abs(p.lat-CTX.lat)>0.4 || Math.abs(p.lon-CTX.lon)>0.4;
   CTX.lat=p.lat; CTX.lon=p.lon; CTX.guessed=p.guessed;
-  paintSky();
+  if(!p.guessed) store.set('pos',{lat:p.lat, lon:p.lon});
+  if(moved) paintSky();
 
   try{
     const w = await weather(CTX.lat,CTX.lon);
     CTX.cloud=w.cloud; CTX.precip=w.precip; CTX.w=w;
   }catch(e){ CTX.cloud=0; CTX.precip=0; }
+  await libP;
   CTX.place = p.guessed ? 'suburban' : await environment(CTX.lat,CTX.lon);
   CTX.tier = tierFor(CTX.w);
   paintSky();
