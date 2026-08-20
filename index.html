@@ -283,7 +283,7 @@ if(!store.get('device')) store.set('device','d'+Math.random().toString(36).slice
 const DEVICE = store.get('device');
 
 // ── screens ─────────────────────────────────────────────────
-const HOME_ON = ['s-entry','s-duration','s-reflect'];
+const HOME_ON = ['s-entry','s-duration','s-reflect'];  // not s-landing: it has its own
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>{
     s.classList.remove('on','shown','receding');
@@ -534,14 +534,18 @@ $('go-back').onclick=()=>show('s-entry');
  * collapsing the expanded list and re-reading the hour, rather than being a
  * button that goes to the page you are already on. It is never shown during a
  * session, so it can never abandon one. */
+/* Home is the landing — the screen with the name on it — not the entry list.
+ * Leaving the reflection this way means answering nothing, which is allowed. */
 $('home').onclick=()=>{
   const here = document.querySelector('.screen.on');
-  if(here && here.id === 's-reflect'){        // leaving without answering
-    reset();
-    return;
+  if(here && here.id === 's-reflect'){
+    PLAN=null; ENGINE=null; clockStart=0; rerolls=0;
+    pausedAt=null; muted=false;
+    $('go-pause').textContent='pause'; $('go-mute').textContent='mute';
+    $('bar').style.width='0%';
   }
   buildEntry();
-  show('s-entry');
+  show('s-landing');
 };
 
 $('go-play').onclick=async()=>{
