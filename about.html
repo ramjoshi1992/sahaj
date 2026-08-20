@@ -167,15 +167,25 @@ hr{border:0;border-top:1px solid var(--rule);margin:44px 0}
   }
   const ctx = remembered();
   const where = place();
+  /* The weather the app last saw. Without it this page drew a clear sky
+     regardless, so it showed stars on a rainy night while the app — correctly
+     — showed none. Anything older than three hours is ignored. */
+  let sky = {cloud:0, precip:0};
+  try{
+    const s=JSON.parse(localStorage.getItem('sahaj.sky')||'null');
+    if(s && Date.now()-s.at < 3*3600*1000) sky={cloud:s.cloud, precip:s.precip};
+  }catch(e){}
   function paint(){
-    const s = SahajSky.sky({lat:ctx.lat, lon:ctx.lon, date:new Date()});
+    const s = SahajSky.sky({lat:ctx.lat, lon:ctx.lon, date:new Date(),
+                            cloud:sky.cloud, precip:sky.precip});
     document.body.style.background = s.css;
     const r=document.documentElement.style;
     r.setProperty('--ink',s.ink); r.setProperty('--dim',s.dim);
     r.setProperty('--faint',s.faint); r.setProperty('--rule',s.rule);
     document.querySelector('meta[name=theme-color]').setAttribute('content',s.stops[0]);
     const layer=document.getElementById('stars'); layer.innerHTML='';
-    SahajSky.stars({lat:ctx.lat, lon:ctx.lon, date:new Date(), place:where})
+    SahajSky.stars({lat:ctx.lat, lon:ctx.lon, date:new Date(),
+                    cloud:sky.cloud, place:where})
       .forEach(st=>{
         const i=document.createElement('i');
         i.style.left=(st.x*100)+'%'; i.style.top=(st.y*100)+'%';
