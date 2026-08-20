@@ -218,13 +218,15 @@ body{animation:pagein .8s ease both}
   <div class="num" id="left">—</div>
   <div class="spacer"></div>
   <div><span class="tex" id="tex-label">quiet</span></div>
+  <!-- transport on one line — pause, mute and stop all act on playback.
+       "something else" sits apart because it changes the music itself. -->
   <div style="margin-top:26px;display:flex;gap:26px">
     <span class="meta tap" id="go-pause">pause</span>
     <span class="meta tap" id="go-mute">mute</span>
-  </div>
-  <div style="margin-top:13px;display:flex;gap:26px">
-    <span class="meta tap" id="go-again">something else</span>
     <span class="meta tap" id="go-stop">stop</span>
+  </div>
+  <div style="margin-top:13px">
+    <span class="meta tap" id="go-again">something else</span>
   </div>
 </section>
 
