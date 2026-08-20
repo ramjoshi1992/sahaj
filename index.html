@@ -310,7 +310,13 @@ function paintSky(){
   paintStars();
 }
 function paintStars(){
-  const layer=$('stars'); layer.innerHTML='';
+  const layer=$('stars');
+  /* Nothing until the weather is in. The first paint happens before the
+   * forecast arrives, and assuming a clear sky there meant stars appeared for
+   * a second and were then taken away by the real cloud cover — which reads as
+   * a glitch rather than as the sky being overcast. */
+  if(!CTX.skyKnown){ layer.innerHTML=''; layer.classList.remove('lit'); return; }
+  layer.innerHTML='';
   requestAnimationFrame(()=>layer.classList.add('lit'));
   // sahajCtx in the console says what the sky thinks is going on — the usual
   // reason for no stars is cloud, not a fault
@@ -332,6 +338,11 @@ function paintStars(){
 }
 
 // ── where and what the weather is ───────────────────────────
+function guessSky(){
+  const s = store.get('sky');
+  if(s && Date.now()-s.at < 3*3600*1000) return {cloud:s.cloud, precip:s.precip};
+  return null;
+}
 function guessPosition(){
   // Somewhere to start before anything has resolved. A remembered position is
   // exact; failing that, longitude follows from the clock's offset and the
@@ -376,16 +387,46 @@ async function environment(lat,lon){
 }
 
 async function weather(lat,lon){
+  /* current.precipitation is the total for the PRECEDING HOUR, so rain that
+   * stopped forty minutes ago still reads as rain. The 15-minute series is
+   * much closer to what is actually falling, which is why a radar-backed
+   * service looks more accurate — not because its data is better. */
   const url='https://api.open-meteo.com/v1/forecast'
     +`?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}`
     +'&current=cloud_cover,precipitation,weather_code'
+    +'&minutely_15=precipitation'
     +'&daily=sunrise,sunset&timezone=auto&forecast_days=1';
   const r=await fetch(url);
   const j=await r.json();
+
+  // the most recent completed quarter hour, and the one now under way
+  let now15=null;
+  try{
+    const t=j.minutely_15.time, v=j.minutely_15.precipitation;
+    const nowMs=Date.now();
+    let idx=-1;
+    for(let i=0;i<t.length;i++){ if(new Date(t[i]).getTime()<=nowMs) idx=i; else break; }
+    if(idx>=0){
+      const a=v[idx]||0, b=(idx>0?v[idx-1]:0)||0;
+      now15=Math.max(a,b);            // mm in a quarter hour
+    }
+  }catch(e){}
+
+  const hourly=(j.current.precipitation||0);   // mm over the last hour
+  const code=j.current.weather_code;
+  // 0.1mm a quarter hour is 0.4mm/hr — light rain you would notice. Drizzle
+  // codes on their own are not enough; they fire on damp air.
+  const heavy=[61,63,65,71,73,75,80,81,82,95,96,99].includes(code);
+  const falling = (now15!==null)
+    ? (now15>=0.1 || (heavy && now15>0))
+    : (hourly>=0.4 && heavy);
+
   return {
     cloud:(j.current.cloud_cover||0)/100,
-    precip:Math.min(1,(j.current.precipitation||0)/2.5),
-    code:j.current.weather_code,
+    // what the sky looks like: gentler, since this only tints the gradient
+    precip: Math.min(1, (now15!==null ? now15*4 : hourly)/2.5),
+    falling,                    // what we say and what changes the music
+    now15, hourly, code,
     sunrise:new Date(j.daily.sunrise[0]),
     sunset:new Date(j.daily.sunset[0]),
   };
@@ -396,8 +437,7 @@ async function weather(lat,lon){
  * fixed clock hours, so it follows the season. */
 function tierFor(w){
   const now=new Date();
-  const wet = w && (w.precip>0.05 || [51,53,55,61,63,65,71,73,75,80,81,82,95,96,99]
-                    .includes(w.code));
+  const wet = w && w.falling;
   if(!w) return now.getHours()<12 ? 'energetic'
        : now.getHours()<18 ? 'balanced' : 'mellow';
   const noon = new Date((w.sunrise.getTime()+w.sunset.getTime())/2);
@@ -414,8 +454,8 @@ function suggestTexture(w,place){
   if(!LIB || !LIB._textures) return null;
   const have = n => LIB._textures.files[n] ? n : null;
   if(w){
-    if([95,96,99].includes(w.code)) return have('storm_1')||have('storm_2');
-    if(w.precip>0.05 || [51,53,55,61,63,65,80,81,82].includes(w.code)) return have('rain');
+    if(w.falling && [95,96,99].includes(w.code)) return have('storm_1')||have('storm_2');
+    if(w.falling) return have('rain');
   }
   const hour=new Date().getHours();
   if(place==='coastal') return have('beach_1');
@@ -433,7 +473,10 @@ function suggestTexture(w,place){
    * enough to look like a fault rather than a night arriving. */
   const first = guessPosition();
   CTX.lat=first.lat; CTX.lon=first.lon; CTX.guessed=first.guessed;
-  CTX.cloud=0; CTX.precip=0;
+  const lastSky = guessSky();
+  CTX.cloud = lastSky ? lastSky.cloud : 0;
+  CTX.precip = lastSky ? lastSky.precip : 0;
+  CTX.skyKnown = !!lastSky;      // stars only once we know what the sky is doing
   paintSky();
 
   const libP = fetch('library.json').then(r=>r.json())
@@ -447,14 +490,17 @@ function suggestTexture(w,place){
 
   try{
     const w = await weather(CTX.lat,CTX.lon);
-    CTX.cloud=w.cloud; CTX.precip=w.precip; CTX.w=w;
+    CTX.cloud=w.cloud; CTX.precip=w.precip; CTX.w=w; CTX.skyKnown=true;
     // the about page has no weather of its own; without this it draws a
     // permanently clear sky and shows stars on a night that has none
     store.set('sky',{cloud:w.cloud, precip:w.precip, at:Date.now()});
   }catch(e){
-    const last=store.get('sky');
+    const last=guessSky();
     CTX.cloud = last ? last.cloud : 0;
     CTX.precip = last ? last.precip : 0;
+    // no forecast and nothing remembered: leave the stars out rather than
+    // guess at a clear sky
+    CTX.skyKnown = !!last;
   }
   await libP;
   CTX.place = p.guessed ? 'suburban' : await environment(CTX.lat,CTX.lon);
@@ -505,7 +551,8 @@ function buildEntry(){
     $('more').classList.add('hidden');
   };
   const when = new Date().toLocaleDateString('en-GB',{weekday:'long'});
-  const sky = CTX.precip>0.05 ? 'rain' : CTX.cloud>0.65 ? 'overcast'
+  const sky = (CTX.w && CTX.w.falling) ? 'rain'
+            : CTX.cloud>0.65 ? 'overcast'
             : CTX.cloud>0.25 ? 'some cloud' : 'clear';
   $('context').textContent = `${when} ${CTX.phase==='night'?'night':
     new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening'} · ${sky}`;
@@ -555,6 +602,7 @@ $('go-play').onclick=async()=>{
       minutes:choice.minutes});
     ENGINE = new ZenEngine({
       onSegment:()=>{},
+      onLog:(m,c)=>{ if(c==='err') console.warn('sahaj:',m); },
       onState:st=>{ if(st.phase==='complete') finish(true); }
     });
 
@@ -719,6 +767,7 @@ $('go-again').onclick=async()=>{
     PLAN = ZenSequencer.buildPlan(LIB,{mood:choice.mood, tier:CTX.tier,
       minutes:leftMin, avoid:wasOpenedBy, warmStart:true});
     ENGINE = new ZenEngine({onSegment:()=>{},
+      onLog:(m,c)=>{ if(c==='err') console.warn('sahaj:',m); },
       onState:st=>{ if(st.phase==='complete') finish(true); }});
     await ENGINE.open();
     const tex = choice.texture ? LIB._textures.files[choice.texture] : null;
