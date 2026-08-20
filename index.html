@@ -86,6 +86,12 @@ body{animation:pagein .8s ease both}
 .skygrid i.a{background:#E9A13B} .skygrid i.v{background:#8B84E8}
 .keyline{display:flex;gap:15px;margin-top:14px;flex-wrap:wrap}
 .keyline b{display:inline-block;width:7px;height:7px;border-radius:1px;margin-right:5px}
+.lands{font-size:15px;line-height:1.55;font-weight:300;color:var(--dim);
+  padding:11px 0;border-bottom:1px solid var(--rule);display:flex;
+  justify-content:space-between;align-items:baseline;gap:14px}
+.lands em{font-style:normal;color:var(--ink)}
+.lands span{font-family:var(--mono);font-size:11px;color:var(--faint);
+  white-space:nowrap;font-variant-numeric:tabular-nums}
 #home{display:inline-block;pointer-events:auto;
   font-family:var(--serif);font-size:17px;font-weight:200;letter-spacing:.05em;
   color:var(--faint);cursor:pointer;transition:color .25s ease;
@@ -312,7 +318,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20e';
+const BUILD = '2026-08-20f';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -1036,6 +1042,8 @@ async function openYou(){
     (rows.length ? '<div style="margin-top:22px">'+rows.map(r=>
       `<div class="rowline"><span>${r[0]}</span><span>${r[1]}</span></div>`
      ).join('')+'</div>' : '')+
+    (st ? whatLands(st.landed) : '')+
+    (st ? staying(st.staying) : '')+
     (st && st.grid ? skyOfIntent(st.grid) : '');
   $('you-action').textContent='sign out';
   $('you-action').onclick=async()=>{
@@ -1049,6 +1057,39 @@ const labelFor = t => {
   const f = LIB && LIB._textures && LIB._textures.files[t];
   return f ? (f.label||t) : (t||'quiet');
 };
+
+/* Sentences, not charts. The Sky of Intent grid is the page's one visual;
+ * a second would make this a dashboard, and the restraint is the point.
+ *
+ * Nothing is graded and nothing trends over time. A percentage framed as an
+ * achievement reads as failure to the person least able to afford reading it
+ * that way, and a month-on-month line built from a dozen sessions is noise
+ * wearing the clothes of insight. Describe, do not score. */
+const MIN_TO_SAY = 5;      // below this, say nothing rather than something noisy
+
+function whatLands(landed){
+  if(!landed || !landed.length) return '';
+  const worth = landed.filter(l => l.total >= MIN_TO_SAY);
+  if(!worth.length) return '';
+  const lines = worth.slice(0,4).map(l => {
+    const phrase = phraseFor(l.mood);
+    return `<div class="lands"><em>${phrase}</em> usually leaves you `+
+           `<em>${l.feeling}</em><span>${l.count} of ${l.total}</span></div>`;
+  }).join('');
+  return '<div class="meta" style="margin-top:32px">what lands</div>'+lines;
+}
+
+function staying(s){
+  if(!s || s.n < MIN_TO_SAY) return '';
+  const asked=Math.round(s.asked), stayed=Math.round(s.stayed);
+  if(!asked) return '';
+  // said plainly either way — finishing is not a score to beat
+  const line = stayed >= asked - 1
+    ? `You usually ask for ${asked} minutes, and stay for them.`
+    : `You usually ask for ${asked} minutes and stay about ${stayed}.`;
+  return '<div class="meta" style="margin-top:30px">how long</div>'+
+         `<div class="lands" style="display:block">${line}</div>`;
+}
 
 /* Seven days, twenty-four hours. Sparse on purpose — the empty squares are
    most of it, and that is the honest picture of anyone's week. */
