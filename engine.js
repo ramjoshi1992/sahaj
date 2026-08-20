@@ -25,8 +25,21 @@
 (function (global) {
   'use strict';
 
-  const LOOKAHEAD_S   = 6.0;   // create a segment this far before it is due
+  /* How far ahead a segment is created and handed to the audio thread.
+   *
+   * This used to be 6s, which meant the main thread had to wake roughly every
+   * eighty seconds to schedule the next piece. Android throttles background
+   * timers to about once a minute and suspends them entirely once the device
+   * dozes, so a locked phone would run out of scheduled audio and fall silent
+   * — while the texture, a single looping source already started, played on.
+   *
+   * Web Audio itself is immune: once start(when) is called with a future time
+   * it fires from the audio thread whatever the page is doing. Scheduling two
+   * segments ahead means the main thread can miss a wake-up entirely and the
+   * music continues. */
+  const LOOKAHEAD_S   = 130.0;
   const PREFETCH      = 3;     // decode this many segments ahead
+  const KEEP_BUFFERS  = 5;     // decoded audio is ~39MB a minute; bound it
   const TEX_GAIN      = 0.15;
   const TEX_FADE_IN   = 10.0;
   const TEX_FADE_OUT  = 18.0;
@@ -107,9 +120,17 @@
         return buf;
       })();
       this.buffers.set(url, pending);
-      const buf = await pending;
-      this.buffers.set(url, buf);
-      return buf;
+      try {
+        const buf = await pending;
+        this.buffers.set(url, buf);
+        return buf;
+      } catch (e) {
+        /* Drop it. Leaving a rejected promise in the cache meant every later
+         * attempt saw a promise, waited, and tried again forever without ever
+         * re-fetching — the music stopped and only the texture played on. */
+        this.buffers.delete(url);
+        throw e;
+      }
     }
 
     /* Only the first segment and the texture are awaited. Everything else is
@@ -139,6 +160,25 @@
         if (seen.has(u)) continue;
         seen.add(u);
         this.fetchBuffer(u).catch(e => this.onLog(e.message, 'err'));
+      }
+      this._evict(i);
+    }
+
+    /* Decoded audio is far bigger than the file it came from — a 110 second
+     * stereo piece is about 39MB in memory, so an unbounded cache would hold
+     * several hundred megabytes by the end of a long session and invite the
+     * browser to kill the tab. Keep what is coming up, drop the rest; anything
+     * needed again is re-fetched, and it will be in the HTTP cache. */
+    _evict(fromIndex) {
+      if (!this.plan || this.buffers.size <= KEEP_BUFFERS) return;
+      const keep = new Set();
+      if (this.textureUrl) keep.add(this.textureUrl);
+      for (let k = Math.max(0, fromIndex - 1);
+           k < Math.min(fromIndex + PREFETCH + 1, this.plan.items.length); k++) {
+        keep.add(this.plan.items[k].url);
+      }
+      for (const url of Array.from(this.buffers.keys())) {
+        if (!keep.has(url)) this.buffers.delete(url);
       }
     }
 
@@ -192,11 +232,22 @@
       const it = p.items[i];
       const prev = p.items[i - 1];
 
-      const play = () => {
+      const play = (tries) => {
+        tries = tries || 0;
         const buf = this.buffers.get(it.url);
         if (!buf || buf instanceof Promise) {
-          // not decoded yet — wait a beat and try again rather than dropping it
-          this._timers.push(setTimeout(() => this._scheduleFrom(i, this.ctx.currentTime + 0.1), 250));
+          // Give it a couple of seconds, then ask for it again; if it still
+          // will not come, move on. A single unreachable file should cost one
+          // segment, not the rest of the session.
+          if (tries === 8) this.fetchBuffer(it.url).catch(() => {});
+          if (tries > 32) {
+            this.onLog('skipping ' + it.stem + ' — could not load', 'err');
+            const nx2 = p.items[i + 1];
+            if (nx2) this._scheduleFrom(i + 1, this.ctx.currentTime + 0.2);
+            else { this.onState({ phase: 'complete' }); this.playing = false; }
+            return;
+          }
+          this._timers.push(setTimeout(() => play(tries + 1), 250));
           return;
         }
         const src = this.ctx.createBufferSource();
@@ -241,8 +292,8 @@
       };
 
       const lead = (when - this.ctx.currentTime - LOOKAHEAD_S) * 1000;
-      if (lead > 20) this._timers.push(setTimeout(play, lead));
-      else play();
+      if (lead > 20) this._timers.push(setTimeout(() => play(0), lead));
+      else play(0);
     }
 
     _tick() {
