@@ -123,13 +123,10 @@ def login():
     session.permanent = True
     session["uid"], session["handle"] = u["id"], u["handle"]
 
-    # adopt anything saved on this device before signing in
-    dev = (d.get("device_id") or "").strip()
-    if dev:
-        with db() as c, c.cursor() as cur:
-            cur.execute("UPDATE sessions SET user_id=%s "
-                        "WHERE device_id=%s AND user_id IS NULL",
-                        (u["id"], dev))
+    # Deliberately NOT adopting this device's earlier sessions. A laptop or a
+    # phone is often shared, and claiming everything recorded on it would hand
+    # one person another's listening history. Signing in changes what happens
+    # from now on, not what happened before.
     return jsonify(handle=u["handle"], since=u["created_at"].isoformat())
 
 
@@ -201,16 +198,15 @@ def save_reflection(sid):
 # ── your own history ────────────────────────────────────────
 
 @app.get("/stats")
+@signed_in
 def stats():
-    """Works signed in (by account) or signed out (by device)."""
-    uid, dev = session.get("uid"), request.args.get("device_id")
-    if uid:
-        where, arg = "user_id=%s", uid
-    elif dev:
-        where, arg = "device_id=%s AND user_id IS NULL", dev
-    else:
-        return jsonify(sessions=0, listened_s=0, top_mood=None,
-                       usual_minutes=None, top_texture=None)
+    """
+    Signed in only. Sessions saved without an account are recorded against a
+    device, but a device is not a person — two people share a laptop — so that
+    history is never shown back to anyone. It exists for aggregate counts.
+    """
+    uid = session.get("uid")
+    where, arg = "user_id=%s", uid
 
     with db() as c, c.cursor() as cur:
         cur.execute(f"SELECT count(*) n, coalesce(sum(played_s),0) s "
