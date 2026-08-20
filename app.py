@@ -218,9 +218,17 @@ def stats():
         cur.execute(f"SELECT minutes FROM sessions WHERE {where} "
                     f"GROUP BY minutes ORDER BY count(*) DESC LIMIT 1", (arg,))
         mins = (cur.fetchone() or {}).get("minutes")
-        cur.execute(f"SELECT coalesce(texture,'quiet') t FROM sessions "
-                    f"WHERE {where} GROUP BY 1 ORDER BY count(*) DESC LIMIT 1", (arg,))
-        tex = (cur.fetchone() or {}).get("t")
+        # How it usually lands. The texture was here instead, but that is chosen
+        # contextually — it would have reported the weather, not the person.
+        cur.execute("SELECT r.feeling FROM reflections r "
+                    "JOIN sessions s ON s.id = r.session_id "
+                    f"WHERE s.{where} GROUP BY r.feeling "
+                    "ORDER BY count(*) DESC LIMIT 1", (arg,))
+        feeling = (cur.fetchone() or {}).get("feeling")
+        cur.execute("SELECT count(*) n FROM reflections r "
+                    "JOIN sessions s ON s.id = r.session_id "
+                    f"WHERE s.{where}", (arg,))
+        reflected = (cur.fetchone() or {}).get("n", 0)
         # for the Sky of Intent grid: weekday and hour of each session
         cur.execute(f"SELECT extract(dow from started_at)::int d, "
                     f"extract(hour from started_at)::int h, mood "
@@ -229,7 +237,8 @@ def stats():
         grid = [dict(day=r["d"], hour=r["h"], mood=r["mood"]) for r in cur.fetchall()]
 
     return jsonify(sessions=t["n"], listened_s=int(t["s"]), top_mood=mood,
-                   usual_minutes=mins, top_texture=tex, grid=grid)
+                   usual_minutes=mins, top_feeling=feeling,
+                   reflections=reflected, grid=grid)
 
 
 # ── the owner view ──────────────────────────────────────────
