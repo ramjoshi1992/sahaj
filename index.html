@@ -448,7 +448,14 @@ function suggestTexture(w,place){
   try{
     const w = await weather(CTX.lat,CTX.lon);
     CTX.cloud=w.cloud; CTX.precip=w.precip; CTX.w=w;
-  }catch(e){ CTX.cloud=0; CTX.precip=0; }
+    // the about page has no weather of its own; without this it draws a
+    // permanently clear sky and shows stars on a night that has none
+    store.set('sky',{cloud:w.cloud, precip:w.precip, at:Date.now()});
+  }catch(e){
+    const last=store.get('sky');
+    CTX.cloud = last ? last.cloud : 0;
+    CTX.precip = last ? last.precip : 0;
+  }
   await libP;
   CTX.place = p.guessed ? 'suburban' : await environment(CTX.lat,CTX.lon);
   CTX.tier = tierFor(CTX.w);
