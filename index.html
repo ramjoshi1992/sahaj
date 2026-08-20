@@ -463,6 +463,19 @@ function tierFor(w){
  * wherever you are. Urban deliberately suggests nothing: geolocation describes
  * what surrounds the building, not the room, and almost every session is
  * indoors — city streets is offered in the picker instead. */
+/* Re-read for every session. This used to be set once during boot, so a second
+ * session in the same page load simply kept whatever the first was left at —
+ * which is what a texture "carrying over" actually was. Nothing to do with
+ * what is stored.
+ *
+ * Choosing a texture and turning it off are different acts: "the river
+ * tonight" is momentary, "no ambience" is a standing preference. So only quiet
+ * is remembered; a positive choice lasts the session that made it. */
+function refreshTexture(){
+  choice.texture = store.get('quiet', false) ? null
+                 : suggestTexture(CTX.w, CTX.place);
+}
+
 function suggestTexture(w,place){
   if(!LIB || !LIB._textures) return null;
   const have = n => LIB._textures.files[n] ? n : null;
@@ -521,9 +534,7 @@ function suggestTexture(w,place){
   paintSky();
   setInterval(paintSky, 60000);
 
-  // a texture the user has chosen before outranks any suggestion
-  const saved = store.get('texture', undefined);
-  choice.texture = (saved===undefined) ? suggestTexture(CTX.w,CTX.place) : saved;
+  refreshTexture();
 
   buildEntry();
   buildDurations();
@@ -599,6 +610,21 @@ function buildDurations(){
 // ── playing ─────────────────────────────────────────────────
 const BREATH_MS = 5200;   // one full cycle of the dot
 
+/* Everything the session screen shows, back to nothing. This used to live only
+ * in reset(), which runs after the reflection — so starting a session any other
+ * way left the previous one's minutes and progress on screen while the new one
+ * was still drawing breath. */
+function clearSessionScreen(){
+  refreshTexture();
+  clearInterval(TIMER); TIMER=null;
+  clockStart=0; pausedAt=null; muted=false;
+  $('bar').style.width='0%';
+  $('left').textContent='';
+  $('go-pause').textContent='pause';
+  $('go-mute').textContent='mute';
+  $('go-again').textContent='something else';
+}
+
 $('go-back').onclick=()=>show('s-entry');
 /* Always does something, wherever it appears. On the entry screen that means
  * collapsing the expanded list and re-reading the hour, rather than being a
@@ -631,6 +657,7 @@ $('go-play').onclick=async()=>{
 
     // the session screen is already behind the breath, so the music arrives
     // into a settled screen rather than one that jumps
+    clearSessionScreen();
     $('s-word').textContent=choice.word;
     setTexLabel();
     show('s-session');
@@ -705,8 +732,11 @@ function openSheet(){
     const isOn = (n===null && !choice.texture) || (n && n===choice.texture);
     d.className='opt'+(isOn?' on':'');
     d.textContent = n ? (files[n].label||n) : (LIB._textures.noneLabel||'quiet');
-    d.onclick=()=>{ choice.texture = n||null; store.set('texture',choice.texture);
-                    applyTexture(); closeSheet(); };
+    d.onclick=()=>{
+      choice.texture = n || null;
+      store.set('quiet', choice.texture === null);   // only the rejection sticks
+      applyTexture(); closeSheet();
+    };
     box.appendChild(d);
   });
   document.querySelectorAll('.step').forEach(s=>{
@@ -727,16 +757,23 @@ function closeSheet(){
 async function applyTexture(){
   setTexLabel();
   if(!ENGINE || !ENGINE.ctx) return;
-  ENGINE.setTextureGain(0.0001);
+  /* Hold the engine and the chosen texture as they are now. The swap happens
+   * two seconds later, by which time the session may have been stopped and
+   * another started — and without this it would reach into the new one. */
+  const eng = ENGINE;
+  const want = choice.texture;
+  eng.setTextureGain(0.0001);
   setTimeout(async()=>{
-    if(ENGINE._texture){ try{ENGINE._texture.stop();}catch(e){} ENGINE._texture=null; }
-    if(choice.texture){
-      const url=LIB._textures.files[choice.texture].url;
-      ENGINE.textureUrl=url;
-      try{ await ENGINE.fetchBuffer(url);
-           ENGINE.setTextureTarget(bedGain());
-           ENGINE._startTexture(ENGINE.ctx.currentTime+0.1); }catch(e){}
-    } else { ENGINE.textureUrl=null; }
+    if(eng !== ENGINE) return;                 // a different session now
+    if(eng._texture){ try{eng._texture.stop();}catch(e){} eng._texture=null; }
+    if(want){
+      const url=LIB._textures.files[want].url;
+      eng.textureUrl=url;
+      try{ await eng.fetchBuffer(url);
+           if(eng !== ENGINE) return;          // and again, after the fetch
+           eng.setTextureTarget(bedGain());
+           eng._startTexture(eng.ctx.currentTime+0.1); }catch(e){}
+    } else { eng.textureUrl=null; }
   },2200);
 }
 
@@ -816,7 +853,10 @@ $('go-stop').onclick=()=>finish(false);
 const REST_AFTER_END = 5200;
 const REST_AFTER_STOP = 2400;
 
+let ending=false;
 function finish(completed){
+  if(ending) return;      // the clock and the engine both announce it
+  ending=true;
   clearInterval(TIMER);
   const played = Math.round(elapsed());
   // a longer tail when it ends of its own accord; stopping should feel prompt
@@ -883,12 +923,11 @@ function buildFeelings(){
 }
 $('skip').onclick=reset;
 function reset(){
-  PLAN=null; ENGINE=null; clockStart=0; rerolls=0;
+  ending=false;
+  PLAN=null; ENGINE=null; rerolls=0;
   // sessionRow is deliberately kept: a queued reflection may still be waiting
   // for the id to come back from a sleeping server
-  pausedAt=null; muted=false;
-  $('go-pause').textContent='pause'; $('go-mute').textContent='mute';
-  $('bar').style.width='0%';
+  clearSessionScreen();
   buildEntry();
   show('s-entry');
 }
