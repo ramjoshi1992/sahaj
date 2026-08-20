@@ -40,11 +40,15 @@ body{
   top:calc(env(safe-area-inset-top,0px) + 22px);
   max-width:520px;margin:0 auto;padding:0 var(--pad);
   pointer-events:none;display:none;
-  align-items:baseline;justify-content:space-between}
+  align-items:baseline;gap:22px}
 #home-rail.on{display:flex}
+/* Left, beside the wordmark, rather than out at the right edge. Everything
+ * else in the app — the phrases, the durations, the session word — hangs off
+ * the same left margin, so a lone right-aligned link was the only thing
+ * pulling the eye across an otherwise narrow column. */
 #rail-about{pointer-events:auto;font-family:var(--mono);font-size:10px;
   letter-spacing:.2em;text-transform:uppercase;color:var(--faint);
-  text-decoration:none;padding:12px 0 12px 16px;margin:-12px 0;
+  text-decoration:none;padding:12px 10px 12px 0;margin:-12px 0;
   transition:color .25s ease}
 #rail-about:active,#rail-about:hover{color:var(--dim)}
 #home{display:inline-block;pointer-events:auto;
@@ -308,6 +312,9 @@ function paintSky(){
 function paintStars(){
   const layer=$('stars'); layer.innerHTML='';
   requestAnimationFrame(()=>layer.classList.add('lit'));
+  // sahajCtx in the console says what the sky thinks is going on — the usual
+  // reason for no stars is cloud, not a fault
+  window.sahajCtx = CTX;
   const st = SahajSky.stars({lat:CTX.lat, lon:CTX.lon, date:new Date(),
                             cloud:CTX.cloud, place:CTX.place});
   st.forEach(s=>{
