@@ -168,14 +168,18 @@ def save_session():
     texture = d.get("texture") or None          # null is a real choice: quiet
     offset = float(d.get("bed_offset_db") or 0)
     device = (d.get("device_id") or "")[:64] or None
+    try:
+        rerolls = max(0, min(50, int(d.get("rerolls") or 0)))
+    except (TypeError, ValueError):
+        rerolls = 0
 
     with db() as c, c.cursor() as cur:
         cur.execute(
             "INSERT INTO sessions (user_id, device_id, mood, tier, minutes, "
-            " plan_seed, texture, bed_offset_db, played_s, completed) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            " plan_seed, texture, bed_offset_db, played_s, completed, rerolls) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (session.get("uid"), device, mood, tier, minutes, seed,
-             texture, offset, played, bool(d.get("completed"))))
+             texture, offset, played, bool(d.get("completed")), rerolls))
         sid = cur.fetchone()["id"]
     return jsonify(session_id=sid), 201
 
@@ -273,54 +277,138 @@ def stats():
 @signed_in
 @owner_only
 def admin_stats():
+    """
+    Two questions, kept apart because they are answered by different numbers.
+
+    Does it work — completion, what people report feeling, which moods deliver
+    what they promise, where sessions are abandoned.
+
+    Would anyone pay for it — whether people come back, how often, and whether
+    that is holding up week on week. For something used a few times a week,
+    weekly return is the honest measure; daily active would flatter nothing.
+    """
     days = min(int(request.args.get("days", 7)), 365)
-    since = f"now() - interval '{days} days'"
-    out = {}
+    win = f"now() - interval '{days} days'"
+    prev = f"now() - interval '{days * 2} days'"
+    out = {"days": days}
+
     with db() as c, c.cursor() as cur:
+        # ── volume, and whether it is moving ──────────────────
         cur.execute(f"SELECT count(*) n, avg(completed::int) done, "
-                    f"       percentile_cont(0.5) WITHIN GROUP (ORDER BY minutes) med "
-                    f"FROM sessions WHERE started_at > {since}")
+                    f"  percentile_cont(0.5) WITHIN GROUP (ORDER BY minutes) med, "
+                    f"  coalesce(sum(played_s),0) secs "
+                    f"FROM sessions WHERE started_at > {win}")
         r = cur.fetchone()
         out["sessions"] = r["n"]
         out["completion_rate"] = round(float(r["done"] or 0), 3)
         out["median_minutes"] = float(r["med"] or 0)
+        out["hours_played"] = round((r["secs"] or 0) / 3600, 1)
 
+        cur.execute(f"SELECT count(*) n FROM sessions "
+                    f"WHERE started_at > {prev} AND started_at <= {win}")
+        before = cur.fetchone()["n"]
+        out["sessions_prev"] = before
+        out["sessions_change"] = (round((out["sessions"] - before) / before, 3)
+                                  if before else None)
+
+        # ── would anyone pay for it ───────────────────────────
+        # Weekly return, measured only against people who have had the chance:
+        # accounts older than the window. Anyone who signed up yesterday cannot
+        # have failed to return yet, and counting them would flatter the number.
+        cur.execute(f"SELECT count(*) n FROM users WHERE created_at <= {win}")
+        eligible = cur.fetchone()["n"]
+        cur.execute(f"SELECT count(DISTINCT s.user_id) n FROM sessions s "
+                    f"JOIN users u ON u.id = s.user_id "
+                    f"WHERE u.created_at <= {win} AND s.started_at > {win}")
+        returned = cur.fetchone()["n"]
+        out["returning"] = dict(of=eligible, came_back=returned,
+                                rate=round(returned / eligible, 3) if eligible else None)
+
+        cur.execute(f"SELECT count(*) n FROM users WHERE created_at > {win}")
+        out["new_accounts"] = cur.fetchone()["n"]
+        cur.execute("SELECT count(*) n FROM users")
+        out["accounts"] = cur.fetchone()["n"]
+
+        # how much people who do come back actually use it
+        cur.execute(f"SELECT count(*)::float / nullif(count(DISTINCT "
+                    f"  coalesce(user_id::text, device_id)),0) per "
+                    f"FROM sessions WHERE started_at > {win}")
+        out["sessions_per_person"] = round(float(cur.fetchone()["per"] or 0), 1)
+
+        # signed in against not — how many think it is worth an account
+        cur.execute(f"SELECT count(*) FILTER (WHERE user_id IS NOT NULL) named, "
+                    f"       count(*) all_n FROM sessions WHERE started_at > {win}")
+        r = cur.fetchone()
+        out["signed_in_share"] = (round(r["named"] / r["all_n"], 3)
+                                  if r["all_n"] else None)
+
+        # eight weeks of volume, for shape rather than a trend line
+        cur.execute("SELECT date_trunc('week', started_at)::date wk, count(*) n "
+                    "FROM sessions WHERE started_at > now() - interval '8 weeks' "
+                    "GROUP BY 1 ORDER BY 1")
+        out["weekly"] = [dict(week=r["wk"].isoformat(), n=r["n"])
+                         for r in cur.fetchall()]
+
+        # ── does it work ──────────────────────────────────────
         cur.execute(f"SELECT mood, count(*) n FROM sessions "
-                    f"WHERE started_at > {since} GROUP BY 1 ORDER BY 2 DESC")
+                    f"WHERE started_at > {win} GROUP BY 1 ORDER BY 2 DESC")
         out["moods"] = cur.fetchall()
 
+        cur.execute(f"SELECT minutes, count(*) n FROM sessions "
+                    f"WHERE started_at > {win} GROUP BY 1 ORDER BY 1")
+        out["durations"] = cur.fetchall()
+
         cur.execute(f"SELECT coalesce(texture,'quiet') texture, count(*) n "
-                    f"FROM sessions WHERE started_at > {since} "
+                    f"FROM sessions WHERE started_at > {win} "
                     f"GROUP BY 1 ORDER BY 2 DESC")
         out["textures"] = cur.fetchall()
 
-        # calibration health — the number to watch. If people are adjusting,
-        # the measurement is wrong, not their taste.
-        cur.execute(f"SELECT texture, avg((bed_offset_db <> 0)::int) adjusted, "
-                    f"       count(*) n FROM sessions "
-                    f"WHERE texture IS NOT NULL AND started_at > {since} "
-                    f"GROUP BY 1 ORDER BY 2 DESC")
-        out["bed_adjustments"] = cur.fetchall()
-
         cur.execute(f"SELECT r.feeling, count(*) n FROM reflections r "
                     f"JOIN sessions s ON s.id=r.session_id "
-                    f"WHERE s.started_at > {since} GROUP BY 1 ORDER BY 2 DESC")
+                    f"WHERE s.started_at > {win} GROUP BY 1 ORDER BY 2 DESC")
         out["feelings"] = cur.fetchall()
 
-        # asked, and felt — does a mood do what its phrase promises
+        cur.execute(f"SELECT count(*) n, "
+                    f"  avg((r.feeling <> 'much the same')::int) shifted "
+                    f"FROM reflections r JOIN sessions s ON s.id=r.session_id "
+                    f"WHERE s.started_at > {win}")
+        r = cur.fetchone()
+        out["reflections"] = r["n"]
+        out["shift_rate"] = round(float(r["shifted"] or 0), 3) if r["n"] else None
+
+        # the claim the whole thing rests on: does a mood do what it says
         cur.execute(f"SELECT s.mood, "
                     f"  avg((r.feeling <> 'much the same')::int) shifted, "
                     f"  count(*) n FROM sessions s "
                     f"JOIN reflections r ON r.session_id=s.id "
-                    f"WHERE s.started_at > {since} GROUP BY 1 ORDER BY 3 DESC")
-        out["asked_and_felt"] = cur.fetchall()
+                    f"WHERE s.started_at > {win} GROUP BY 1 ORDER BY 3 DESC")
+        out["asked_and_felt"] = [dict(mood=r["mood"], n=r["n"],
+                                      shifted=round(float(r["shifted"]), 3))
+                                 for r in cur.fetchall()]
 
-        # how far in people stop, as a fraction of what they asked for
-        cur.execute(f"SELECT width_bucket(played_s::float/(minutes*60), 0, 1, 5) b, "
-                    f"       count(*) n FROM sessions "
-                    f"WHERE completed = false AND started_at > {since} "
+        # where people leave, as a fraction of what they asked for
+        cur.execute(f"SELECT width_bucket(played_s::float/(minutes*60),0,1,5) b, "
+                    f"  count(*) n FROM sessions "
+                    f"WHERE completed = false AND started_at > {win} "
                     f"GROUP BY 1 ORDER BY 1")
         out["stopped_at"] = cur.fetchall()
+
+        # ── product health: symptoms, not achievements ────────
+        cur.execute(f"SELECT texture, avg((bed_offset_db <> 0)::int) adjusted, "
+                    f"  count(*) n FROM sessions "
+                    f"WHERE texture IS NOT NULL AND started_at > {win} "
+                    f"GROUP BY 1 HAVING count(*) >= 3 ORDER BY 2 DESC")
+        out["bed_adjustments"] = [dict(texture=r["texture"], n=r["n"],
+                                       adjusted=round(float(r["adjusted"]), 3))
+                                  for r in cur.fetchall()]
+
+        cur.execute(f"SELECT mood, avg((rerolls > 0)::int) rerolled, count(*) n "
+                    f"FROM sessions WHERE started_at > {win} "
+                    f"GROUP BY 1 HAVING count(*) >= 3 ORDER BY 2 DESC")
+        out["rerolls"] = [dict(mood=r["mood"], n=r["n"],
+                               rerolled=round(float(r["rerolled"]), 3))
+                          for r in cur.fetchall()]
+
     return jsonify(out)
 
 
