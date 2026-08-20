@@ -211,7 +211,7 @@ body{animation:pagein .8s ease both}
     It never assembles the same way twice.</div>
   <div class="spacer"></div>
   <div class="act" id="go-begin">begin</div>
-  <div class="meta" style="margin-top:17px">no account needed</div>
+  <div class="meta" id="landing-note" style="margin-top:17px">no account needed</div>
 </section>
 
 <!-- entry -->
@@ -312,7 +312,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20c';
+const BUILD = '2026-08-20d';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -591,6 +591,7 @@ function suggestTexture(w,place){
   buildEntry();
   buildDurations();
   buildFeelings();
+  whoAmI();
 })();
 
 /* Hold the navigation just long enough for the page to go. */
@@ -966,6 +967,25 @@ window.addEventListener('pagehide',()=>{
  * Signing in changes what happens from here, not what happened before. */
 let ME = null;
 
+/* Reflect the account in the chrome. "no account needed" is there to reassure
+ * someone hesitating on the landing; once they are in it has no job, so it
+ * goes rather than being replaced with something that states the obvious. */
+function paintIdentity(){
+  const name = ME || 'you';
+  const you = $('rail-you'), ly = $('landing-you');
+  if(you) you.textContent = name;
+  if(ly) ly.textContent = name;
+  const note = $('landing-note');
+  if(note) note.style.visibility = ME ? 'hidden' : 'visible';
+}
+
+/* Asked once on load, so the app knows before anyone taps anything. It is also
+ * the first call of the session, which quietly wakes a sleeping server. */
+async function whoAmI(){
+  try{ ME = (await api('/me')).handle; }catch(e){ ME = null; }
+  paintIdentity();
+}
+
 const CALM = ['anxious','sleepy','socially-drained'];
 const fmtTime = s => {
   const h=Math.floor(s/3600), m=Math.round((s%3600)/60);
@@ -985,6 +1005,7 @@ async function openYou(){
   const body=$('you-body');
   body.innerHTML='<div class="meta">…</div>';
   try{ ME = (await api('/me')).handle; }catch(e){ ME=null; }
+  paintIdentity();
 
   if(!ME){
     body.innerHTML =
@@ -1016,7 +1037,7 @@ async function openYou(){
   $('you-action').textContent='sign out';
   $('you-action').onclick=async()=>{
     try{ await api('/logout',{method:'POST'}); }catch(e){}
-    ME=null; openYou();
+    ME=null; paintIdentity(); openYou();
   };
 }
 
@@ -1080,6 +1101,7 @@ $('auth-go').onclick=async()=>{
     await api(authMode==='up' ? '/register' : '/login',
       {method:'POST', body:JSON.stringify({handle,password})});
     $('in-handle').value=''; $('in-pass').value='';
+    paintIdentity();
     openYou();
   }catch(e){
     $('auth-err').textContent=e.message;
