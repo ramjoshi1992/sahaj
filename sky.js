@@ -281,5 +281,6 @@
     };
   }
 
+  global.SAHAJ_SKY_BUILD = '2026-08-20a';
   global.SahajSky = { sky, stars, solarAltitude, localSiderealDeg, bind, weather, STARS };
 })(typeof window !== 'undefined' ? window : globalThis);
