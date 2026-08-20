@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sahaj — owner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,200..500&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#F4F1E9;--dim:rgba(244,241,233,.56);--faint:rgba(244,241,233,.30);
+  --rule:rgba(244,241,233,.11);--bg:#0A0B0E;--panel:#101319;
+  --amber:#E9A13B;--violet:#8B84E8;
+  --serif:'Newsreader',Georgia,serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+*{box-sizing:border-box}
+/* No sky here. The sky belongs to the session; this is a spreadsheet with
+   better manners, and it should not pretend to be part of the product. */
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif);
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:52px 32px 100px}
+a{color:var(--dim)}
+.top{display:flex;justify-content:space-between;align-items:baseline;
+  flex-wrap:wrap;gap:16px;margin-bottom:8px}
+h1{font-size:29px;font-weight:200;margin:0;letter-spacing:-.01em}
+.meta{font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--faint)}
+.range{display:flex;gap:14px}
+.range span{cursor:pointer}
+.range span.on{color:var(--ink)}
+.lede{font-size:14px;color:var(--faint);margin:0 0 34px}
+
+h2{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--faint);font-weight:400;margin:44px 0 6px}
+.h2note{font-size:13px;color:var(--faint);margin:0 0 18px;max-width:62ch;line-height:1.55}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+  background:var(--rule);border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+.kpi{background:var(--panel);padding:17px 19px 19px}
+.kpi .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--faint);display:block;margin-bottom:9px}
+.kpi .v{font-family:var(--mono);font-size:25px;font-weight:300;
+  font-variant-numeric:tabular-nums}
+.kpi .t{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:5px;
+  display:block}
+.kpi .t.up{color:var(--amber)} .kpi .t.warn{color:var(--violet)}
+
+.cols{display:grid;grid-template-columns:1.25fr 1fr;gap:34px}
+@media(max-width:840px){.cols{grid-template-columns:1fr}}
+.bar{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+.bar .lbl{font-size:13.5px;font-weight:300;width:120px;flex:none;color:var(--dim)}
+.bar .track{flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px;
+  overflow:hidden}
+.bar .fill{height:100%;background:var(--violet);opacity:.85}
+.bar .fill.a{background:var(--amber)}
+.bar .val{font-family:var(--mono);font-size:11px;color:var(--faint);width:52px;
+  text-align:right;font-variant-numeric:tabular-nums}
+
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;
+  font-variant-numeric:tabular-nums}
+th{text-align:left;font-weight:400;font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--faint);padding:0 10px 9px 0;
+  border-bottom:1px solid var(--rule)}
+td{padding:8px 10px 8px 0;color:var(--dim);border-bottom:1px solid rgba(255,255,255,.04)}
+td:first-child{font-family:var(--serif);font-size:13.5px;font-weight:300}
+th:last-child,td:last-child{text-align:right;padding-right:0;color:var(--faint)}
+td.good{color:var(--ink)} td.thin{color:var(--faint)} td.warn{color:var(--amber)}
+
+.weeks{display:flex;align-items:flex-end;gap:5px;height:74px;margin-top:6px}
+.weeks div{flex:1;background:var(--violet);opacity:.5;border-radius:2px 2px 0 0;
+  min-height:2px;position:relative}
+.weeks div:last-child{opacity:.9}
+.wlabels{display:flex;gap:5px;margin-top:6px}
+.wlabels span{flex:1;font-family:var(--mono);font-size:8.5px;color:var(--faint);
+  text-align:center}
+
+.flag{border:1px solid rgba(233,161,59,.26);border-radius:9px;padding:16px 18px;
+  margin-top:18px;background:rgba(233,161,59,.04)}
+.flag .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--amber);display:block;margin-bottom:8px}
+.flag p{margin:0;font-size:13.5px;line-height:1.6;color:var(--dim)}
+.gate{max-width:44ch;margin:80px auto;text-align:left}
+.gate p{font-size:15px;line-height:1.7;color:var(--dim)}
+.empty{font-size:13.5px;color:var(--faint);padding:10px 0}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <div class="meta">loading…</div>
+</div>
+
+<script>
+const API='https://lull-h6bd.onrender.com';
+const $=id=>document.getElementById(id);
+const pct=v=>v==null?'—':Math.round(v*100)+'%';
+const PHRASE={kickstart:'wake up',happy:'feel brighter',unmotivated:'start afresh',
+  focus:'shut out the noise',anxious:'settle my mind',
+  'socially-drained':'be away from people',sleepy:'sleep'};
+let DAYS=7;
+
+async function load(){
+  const wrap=$('wrap');
+  let d;
+  try{
+    const r=await fetch(API+'/admin/stats?days='+DAYS,{credentials:'include'});
+    if(r.status===404 || r.status===401){ return gate(); }
+    d=await r.json();
+  }catch(e){ wrap.innerHTML='<div class="gate"><p>Could not reach the API.</p></div>';
+             return; }
+  render(d);
+}
+
+function gate(){
+  $('wrap').innerHTML=
+    '<div class="gate"><h1>Not here</h1>'+
+    '<p>Sign in as the owner account in the app first, then come back. '+
+    'This page has no login of its own — it uses the same session.</p>'+
+    '<p><a href="index.html">back to sahaj</a></p></div>';
+}
+
+function bars(rows, key, label, amber){
+  if(!rows || !rows.length) return '<div class="empty">nothing yet</div>';
+  const max=Math.max(...rows.map(r=>r.n));
+  return rows.map(r=>{
+    const name = label ? label(r) : r[key];
+    return `<div class="bar"><span class="lbl">${name}</span>`+
+      `<span class="track"><span class="fill${amber?' a':''}" `+
+      `style="width:${Math.round(r.n/max*100)}%"></span></span>`+
+      `<span class="val">${r.n}</span></div>`;
+  }).join('');
+}
+
+function render(d){
+  const chg = d.sessions_change;
+  const ret = d.returning || {};
+  const weeks = d.weekly || [];
+  const wmax = Math.max(1, ...weeks.map(w=>w.n));
+
+  const stopLabels=['first fifth','second','middle','fourth','last fifth'];
+
+  $('wrap').innerHTML = `
+  <div class="top">
+    <h1>Owner</h1>
+    <div class="meta range">
+      ${[7,30,90].map(n=>`<span class="${n===DAYS?'on':''}" data-d="${n}">${n} days</span>`).join('')}
+    </div>
+  </div>
+  <p class="lede">Two questions, kept apart: whether it works, and whether anyone
+    would pay for it. Nothing here is a target.</p>
+
+  <h2>Would anyone pay for it</h2>
+  <p class="h2note">Weekly return, not daily — this is used a few times a week by
+    design, so daily active would flatter nothing. Measured only against accounts
+    old enough to have had the chance.</p>
+  <div class="kpis">
+    <div class="kpi"><span class="k">sessions</span><span class="v">${d.sessions}</span>
+      <span class="t ${chg>0?'up':''}">${chg==null?'no prior window'
+        :(chg>=0?'+':'')+Math.round(chg*100)+'% on the previous '+d.days+' days'}</span></div>
+    <div class="kpi"><span class="k">came back</span>
+      <span class="v">${pct(ret.rate)}</span>
+      <span class="t">${ret.came_back||0} of ${ret.of||0} accounts</span></div>
+    <div class="kpi"><span class="k">sessions each</span>
+      <span class="v">${d.sessions_per_person}</span>
+      <span class="t">per person, ${d.days} days</span></div>
+    <div class="kpi"><span class="k">new accounts</span>
+      <span class="v">${d.new_accounts}</span>
+      <span class="t">${d.accounts} in total</span></div>
+    <div class="kpi"><span class="k">worth an account</span>
+      <span class="v">${pct(d.signed_in_share)}</span>
+      <span class="t">of sessions were signed in</span></div>
+    <div class="kpi"><span class="k">hours played</span>
+      <span class="v">${d.hours_played}</span>
+      <span class="t">median ${d.median_minutes} min</span></div>
+  </div>
+
+  <h2>Eight weeks</h2>
+  <div class="weeks">${weeks.map(w=>
+    `<div style="height:${Math.round(w.n/wmax*100)}%" title="${w.week}: ${w.n}"></div>`
+   ).join('')||'<div style="height:2%"></div>'}</div>
+  <div class="wlabels">${weeks.map(w=>`<span>${w.week.slice(5)}</span>`).join('')}</div>
+
+  <h2>Does it work</h2>
+  <p class="h2note">The claim the whole thing rests on. A mood that rarely shifts
+    anyone is a mood whose material needs regenerating — not a user problem.</p>
+  <div class="kpis" style="margin-bottom:26px">
+    <div class="kpi"><span class="k">played to the end</span>
+      <span class="v">${pct(d.completion_rate)}</span>
+      <span class="t">of ${d.sessions} sessions</span></div>
+    <div class="kpi"><span class="k">reported a shift</span>
+      <span class="v">${pct(d.shift_rate)}</span>
+      <span class="t">of ${d.reflections} reflections</span></div>
+    <div class="kpi"><span class="k">left a reflection</span>
+      <span class="v">${d.sessions?pct(d.reflections/d.sessions):'—'}</span>
+      <span class="t">of all sessions</span></div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <h2 style="margin-top:0">Asked, and felt</h2>
+      ${d.asked_and_felt && d.asked_and_felt.length ? `<table>
+        <tr><th>asked to</th><th>shifted</th><th>n</th></tr>
+        ${d.asked_and_felt.map(r=>`<tr>
+          <td>${PHRASE[r.mood]||r.mood}</td>
+          <td class="${r.n<5?'thin':(r.shifted>=0.7?'good':'warn')}">${pct(r.shifted)}</td>
+          <td>${r.n}</td></tr>`).join('')}
+      </table><p class="h2note" style="margin-top:12px">Anything under five
+        reflections is greyed — it is not yet a finding.</p>`
+       : '<div class="empty">no reflections yet</div>'}
+
+      <h2>Where sessions stop</h2>
+      ${bars((d.stopped_at||[]).map(r=>({n:r.n,b:r.b})),'b',
+             r=>stopLabels[(r.b||1)-1]||'—', true)}
+    </div>
+
+    <div>
+      <h2 style="margin-top:0">What people report</h2>
+      ${bars(d.feelings,'feeling',r=>r.feeling)}
+
+      <h2>What they ask for</h2>
+      ${bars(d.moods,'mood',r=>PHRASE[r.mood]||r.mood)}
+
+      <h2>How long</h2>
+      ${bars(d.durations,'minutes',r=>r.minutes+' min')}
+    </div>
+  </div>
+
+  <h2>Product health</h2>
+  <p class="h2note">Symptoms, not scores. Both of these say the system is wrong
+    rather than the listener.</p>
+  <div class="cols">
+    <div>
+      <div class="meta">bed level adjusted</div>
+      ${d.bed_adjustments && d.bed_adjustments.length ? `<table style="margin-top:10px">
+        <tr><th>texture</th><th>adjusted</th><th>n</th></tr>
+        ${d.bed_adjustments.map(r=>`<tr><td>${r.texture}</td>
+          <td class="${r.adjusted>0.15?'warn':''}">${pct(r.adjusted)}</td>
+          <td>${r.n}</td></tr>`).join('')}</table>`
+        : '<div class="empty">nothing yet</div>'}
+      <div class="flag"><span class="k">what to watch</span>
+        <p>If people are adjusting, the measurement is wrong — not their taste.
+          Anything above about 15% on one texture means its calibration needs
+          rerunning.</p></div>
+    </div>
+    <div>
+      <div class="meta">asked for something else</div>
+      ${d.rerolls && d.rerolls.length ? `<table style="margin-top:10px">
+        <tr><th>mood</th><th>rerolled</th><th>n</th></tr>
+        ${d.rerolls.map(r=>`<tr><td>${PHRASE[r.mood]||r.mood}</td>
+          <td class="${r.rerolled>0.2?'warn':''}">${pct(r.rerolled)}</td>
+          <td>${r.n}</td></tr>`).join('')}</table>`
+        : '<div class="empty">nothing yet</div>'}
+      <div class="flag"><span class="k">what to watch</span>
+        <p>A mood people keep rerolling is a mood whose material is not landing.
+          That is a generation problem, and the fix is new seeds rather than
+          new sequencing.</p></div>
+    </div>
+  </div>
+
+  <p class="meta" style="margin-top:50px"><a href="index.html">back to sahaj</a></p>`;
+
+  document.querySelectorAll('.range span').forEach(el=>{
+    el.onclick=()=>{ DAYS=+el.dataset.d; load(); };
+  });
+}
+load();
+</script>
+</body>
+</html>
