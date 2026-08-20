@@ -17,10 +17,21 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
+/* the same colour behind the body, so a fading page does not show white */
+html{background:#05070D}
 body{
   margin:0;background:#05070D;color:var(--ink);font-family:var(--serif);
   -webkit-font-smoothing:antialiased;overflow:hidden;
-  transition:background 3s linear;
+  transition:background 3s linear, opacity .42s ease;
+}
+/* About is a separate document, so nothing carries across a real page load.
+   Fading out first and in on arrival makes the seam invisible. */
+body.leaving{opacity:0}
+body{animation:pagein .8s ease both}
+@keyframes pagein{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  body{animation:none}
+  body.leaving{opacity:1}
 }
 #stars{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0;
   opacity:0;transition:opacity 2.4s ease}
@@ -516,6 +527,16 @@ function suggestTexture(w,place){
   buildDurations();
   buildFeelings();
 })();
+
+/* Hold the navigation just long enough for the page to go. */
+document.querySelectorAll('a[href="about.html"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    if(e.metaKey||e.ctrlKey||e.shiftKey) return;
+    e.preventDefault();
+    document.body.classList.add('leaving');
+    setTimeout(()=>{ location.href='about.html'; }, 420);
+  });
+});
 
 // ── entry ───────────────────────────────────────────────────
 /* Contextual ordering: at night sleep rises, in the morning waking does.
