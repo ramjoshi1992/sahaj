@@ -318,7 +318,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20f';
+const BUILD = '2026-08-20g';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -934,6 +934,7 @@ function sessionBody(completed){
     device_id:DEVICE, mood:choice.mood, tier:CTX.tier, minutes:choice.minutes,
     plan_seed:PLAN?PLAN.seed:0, texture:choice.texture||null,
     bed_offset_db:choice.offset||0,
+    rerolls:rerolls||0,
     played_s: Math.round(elapsed()),
     completed:!!completed
   });
