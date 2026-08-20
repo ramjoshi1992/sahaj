@@ -283,7 +283,12 @@
           this._timers.push(setTimeout(
             () => this._scheduleFrom(i + 1, nextWhen), lead * 1000));
         } else {
-          const endIn = (it.len / this.speed + 1) * 1000;
+          /* Count from when this segment actually starts, not from now. The
+           * last segment is created up to LOOKAHEAD_S ahead of time, so timing
+           * this from the moment of scheduling ended a ten minute session at
+           * eight — the completion fired the whole lookahead early. */
+          const endAt = when + it.len / this.speed;
+          const endIn = Math.max(500, (endAt - this.ctx.currentTime + 1) * 1000);
           this._timers.push(setTimeout(() => {
             this.onState({ phase: 'complete' });
             this.playing = false;
