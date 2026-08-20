@@ -236,9 +236,35 @@ def stats():
                     f"AND started_at > now() - interval '7 days'", (arg,))
         grid = [dict(day=r["d"], hour=r["h"], mood=r["mood"]) for r in cur.fetchall()]
 
+        # Which of the seven actually work for this person. The only figure
+        # here that could change what someone chooses next time.
+        cur.execute("SELECT s.mood, r.feeling, count(*) n "
+                    "FROM sessions s JOIN reflections r ON r.session_id = s.id "
+                    f"WHERE s.{where} GROUP BY 1,2", (arg,))
+        by_mood = {}
+        for r in cur.fetchall():
+            m = by_mood.setdefault(r["mood"], {"total": 0, "feelings": {}})
+            m["total"] += r["n"]
+            m["feelings"][r["feeling"]] = r["n"]
+        landed = []
+        for mood, d in by_mood.items():
+            top = max(d["feelings"].items(), key=lambda kv: kv[1])
+            landed.append(dict(mood=mood, feeling=top[0], count=top[1],
+                               total=d["total"]))
+        landed.sort(key=lambda x: -x["total"])
+
+        # asked for, against stayed for
+        cur.execute(f"SELECT avg(minutes)::float asked, "
+                    f"       avg(played_s)::float / 60 stayed, count(*) n "
+                    f"FROM sessions WHERE {where}", (arg,))
+        r = cur.fetchone()
+        staying = dict(asked=round(r["asked"] or 0, 1),
+                       stayed=round(r["stayed"] or 0, 1), n=r["n"])
+
     return jsonify(sessions=t["n"], listened_s=int(t["s"]), top_mood=mood,
                    usual_minutes=mins, top_feeling=feeling,
-                   reflections=reflected, grid=grid)
+                   reflections=reflected, grid=grid,
+                   landed=landed, staying=staying)
 
 
 # ── the owner view ──────────────────────────────────────────
