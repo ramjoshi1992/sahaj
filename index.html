@@ -57,11 +57,35 @@ body{animation:pagein .8s ease both}
  * else in the app — the phrases, the durations, the session word — hangs off
  * the same left margin, so a lone right-aligned link was the only thing
  * pulling the eye across an otherwise narrow column. */
-#rail-about{pointer-events:auto;font-family:var(--mono);font-size:10px;
+#rail-you,#rail-about{pointer-events:auto;font-family:var(--mono);font-size:10px;
   letter-spacing:.2em;text-transform:uppercase;color:var(--faint);
   text-decoration:none;padding:12px 10px 12px 0;margin:-12px 0;
   transition:color .25s ease}
-#rail-about:active,#rail-about:hover{color:var(--dim)}
+#rail-about:active,#rail-about:hover,
+#rail-you:active,#rail-you:hover{color:var(--dim)}
+#rail-you{cursor:pointer}
+
+/* forms — a line to write on, nothing more */
+.field{border-bottom:1px solid var(--rule);padding:8px 0 7px;margin-top:22px}
+.field label{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+.field input{width:100%;background:none;border:0;outline:none;color:var(--ink);
+  font-family:var(--serif);font-size:17px;font-weight:300;padding:0}
+.field input::placeholder{color:var(--faint)}
+.rowline{display:flex;justify-content:space-between;align-items:baseline;
+  padding:12px 0;border-bottom:1px solid var(--rule);gap:14px}
+.rowline span:first-child{font-size:15px;font-weight:300}
+.rowline span:last-child{font-family:var(--mono);font-size:12.5px;color:var(--dim);
+  font-variant-numeric:tabular-nums;text-align:right}
+.note-line{font-size:13.5px;line-height:1.6;color:var(--faint);margin-top:20px}
+.err{font-size:13.5px;color:#e08a6c;margin-top:16px;min-height:18px}
+.skygrid{display:grid;grid-template-columns:15px repeat(24,1fr);gap:2px;margin-top:14px;
+  align-items:center}
+.skygrid .d{font-family:var(--mono);font-size:8px;color:var(--faint)}
+.skygrid i{aspect-ratio:1;border-radius:1px;background:rgba(244,241,233,.06)}
+.skygrid i.a{background:#E9A13B} .skygrid i.v{background:#8B84E8}
+.keyline{display:flex;gap:15px;margin-top:14px;flex-wrap:wrap}
+.keyline b{display:inline-block;width:7px;height:7px;border-radius:1px;margin-right:5px}
 #home{display:inline-block;pointer-events:auto;
   font-family:var(--serif);font-size:17px;font-weight:200;letter-spacing:.05em;
   color:var(--faint);cursor:pointer;transition:color .25s ease;
@@ -168,6 +192,7 @@ body{animation:pagein .8s ease both}
 <div id="home-rail">
   <span id="home">sahaj</span>
   <a id="rail-about" href="about.html">about</a>
+  <span id="rail-you" class="railink">you</span>
 </div>
 
 <!-- landing -->
@@ -240,6 +265,29 @@ body{animation:pagein .8s ease both}
 </section>
 
 <div id="breath"><div class="dot"></div><div class="say" id="breath-say"></div></div>
+<section class="screen" id="s-you">
+  <div class="spacer"></div>
+  <div id="you-body"></div>
+  <div class="spacer"></div>
+  <div class="meta tap" id="you-action">sign in</div>
+</section>
+
+<section class="screen" id="s-auth">
+  <div class="spacer"></div>
+  <div class="said" id="auth-title">Keep your sessions?</div>
+  <div class="field"><label>handle</label>
+    <input id="in-handle" autocomplete="username" autocapitalize="none"
+           spellcheck="false" placeholder="a name only you use"></div>
+  <div class="field"><label>password</label>
+    <input id="in-pass" type="password" autocomplete="current-password"
+           placeholder="at least 8 characters"></div>
+  <div class="err" id="auth-err"></div>
+  <div class="act" id="auth-go" style="margin-top:26px">continue</div>
+  <div class="note-line" id="auth-note"></div>
+  <div class="spacer"></div>
+  <div class="meta tap" id="auth-swap">create an account instead</div>
+</section>
+
 <div id="scrim"></div>
 <div id="sheet">
   <div class="meta" style="margin-bottom:13px">around you</div>
@@ -296,7 +344,7 @@ if(!store.get('device')) store.set('device','d'+Math.random().toString(36).slice
 const DEVICE = store.get('device');
 
 // ── screens ─────────────────────────────────────────────────
-const HOME_ON = ['s-entry','s-duration','s-reflect'];  // not s-landing: it has its own
+const HOME_ON = ['s-entry','s-duration','s-reflect','s-you','s-auth'];  // not s-landing: it has its own
 function show(id){
   document.querySelectorAll('.screen').forEach(s=>{
     s.classList.remove('on','shown','receding');
@@ -463,17 +511,17 @@ function tierFor(w){
  * wherever you are. Urban deliberately suggests nothing: geolocation describes
  * what surrounds the building, not the room, and almost every session is
  * indoors — city streets is offered in the picker instead. */
-/* Re-read for every session. This used to be set once during boot, so a second
- * session in the same page load simply kept whatever the first was left at —
- * which is what a texture "carrying over" actually was. Nothing to do with
- * what is stored.
+/* Every session starts from the suggestion. Nothing about the texture carries
+ * over — not a choice, and not a refusal.
  *
- * Choosing a texture and turning it off are different acts: "the river
- * tonight" is momentary, "no ambience" is a standing preference. So only quiet
- * is remembered; a positive choice lasts the session that made it. */
+ * Both were tried. Persisting a chosen texture meant the app stopped reading
+ * the weather; persisting "quiet" meant one tap silently switched the layer
+ * off for good. Either way a session inherited something the listener had
+ * decided in a different hour, under different weather, which is the one thing
+ * this app is supposed not to do. The choice applies to the session that makes
+ * it and no further. */
 function refreshTexture(){
-  choice.texture = store.get('quiet', false) ? null
-                 : suggestTexture(CTX.w, CTX.place);
+  choice.texture = suggestTexture(CTX.w, CTX.place);
 }
 
 function suggestTexture(w,place){
@@ -733,8 +781,7 @@ function openSheet(){
     d.className='opt'+(isOn?' on':'');
     d.textContent = n ? (files[n].label||n) : (LIB._textures.noneLabel||'quiet');
     d.onclick=()=>{
-      choice.texture = n || null;
-      store.set('quiet', choice.texture === null);   // only the rejection sticks
+      choice.texture = n || null;      // this session only
       applyTexture(); closeSheet();
     };
     box.appendChild(d);
@@ -907,6 +954,133 @@ window.addEventListener('pagehide',()=>{
       new Blob([sessionBody(false)],{type:'application/json'})); }catch(e){}
   }
 });
+
+// ── you ─────────────────────────────────────────────────────
+/* Signed out, this page shows nothing personal. Sessions without an account
+ * are recorded against the device, but a laptop or a phone is often shared —
+ * two people, one browser — so that history is never presented as anyone's.
+ * Signing in changes what happens from here, not what happened before. */
+let ME = null;
+
+const CALM = ['anxious','sleepy','socially-drained'];
+const fmtTime = s => {
+  const h=Math.floor(s/3600), m=Math.round((s%3600)/60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+};
+
+async function api(path, opts){
+  const r = await fetch(API+path, Object.assign({credentials:'include',
+    headers:{'Content-Type':'application/json'}}, opts||{}));
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || ('something went wrong ('+r.status+')'));
+  return j;
+}
+
+async function openYou(){
+  show('s-you');
+  const body=$('you-body');
+  body.innerHTML='<div class="meta">…</div>';
+  try{ ME = (await api('/me')).handle; }catch(e){ ME=null; }
+
+  if(!ME){
+    body.innerHTML =
+      '<div class="phrase" style="font-size:21px">Nothing is kept yet.</div>'+
+      '<div class="note-line" style="max-width:30ch">An account keeps your '+
+      'sessions — and keeps them yours, if someone else uses this device too. '+
+      'Nothing else is stored: no email, no location.</div>';
+    $('you-action').textContent='sign in';
+    $('you-action').onclick=()=>openAuth(false);
+    return;
+  }
+
+  let st=null;
+  try{ st = await api('/stats'); }catch(e){}
+  const rows = st ? [
+    ['sessions', st.sessions],
+    ['time listened', fmtTime(st.listened_s||0)],
+    ['most asked', st.top_mood ? phraseFor(st.top_mood) : '—'],
+    ['usual length', st.usual_minutes ? st.usual_minutes+' min' : '—'],
+    ['surroundings', st.top_texture ? labelFor(st.top_texture) : '—'],
+  ] : [];
+
+  body.innerHTML =
+    `<div class="phrase" style="font-size:21px">${ME}</div>`+
+    (rows.length ? '<div style="margin-top:22px">'+rows.map(r=>
+      `<div class="rowline"><span>${r[0]}</span><span>${r[1]}</span></div>`
+     ).join('')+'</div>' : '')+
+    (st && st.grid ? skyOfIntent(st.grid) : '');
+  $('you-action').textContent='sign out';
+  $('you-action').onclick=async()=>{
+    try{ await api('/logout',{method:'POST'}); }catch(e){}
+    ME=null; openYou();
+  };
+}
+
+const phraseFor = m => (MOODS.find(x=>x.mood===m)||{}).phrase || m;
+const labelFor = t => {
+  const f = LIB && LIB._textures && LIB._textures.files[t];
+  return f ? (f.label||t) : (t||'quiet');
+};
+
+/* Seven days, twenty-four hours. Sparse on purpose — the empty squares are
+   most of it, and that is the honest picture of anyone's week. */
+function skyOfIntent(grid){
+  if(!grid.length) return '';
+  const days=['S','M','T','W','T','F','S'];
+  const at={};
+  grid.forEach(g=>{ at[g.day+':'+g.hour] = CALM.includes(g.mood)?'a':'v'; });
+  let html='<div class="meta" style="margin-top:30px">your last seven days</div>'+
+           '<div class="skygrid">';
+  for(let d=0; d<7; d++){
+    html+=`<span class="d">${days[d]}</span>`;
+    for(let h=0; h<24; h++){
+      const k=at[d+':'+h];
+      html+=`<i class="${k||''}"></i>`;
+    }
+  }
+  html+='</div><div class="keyline">'+
+    '<span class="meta"><b style="background:#E9A13B"></b>settling</span>'+
+    '<span class="meta"><b style="background:#8B84E8"></b>waking</span>'+
+    '</div>';
+  return html;
+}
+
+// ── signing in ──────────────────────────────────────────────
+let authMode='in';
+function openAuth(creating){
+  authMode = creating ? 'up' : 'in';
+  $('auth-title').textContent = creating ? 'A name and a password.'
+                                         : 'Keep your sessions?';
+  $('auth-note').textContent = creating
+    ? 'There is no way to reset this. No email is stored, so if the password '
+    + 'is lost the account cannot be recovered — choose something you keep.'
+    : '';
+  $('auth-swap').textContent = creating ? 'I already have one'
+                                        : 'create an account instead';
+  $('in-pass').setAttribute('autocomplete', creating ? 'new-password'
+                                                     : 'current-password');
+  $('auth-err').textContent='';
+  $('auth-go').textContent='continue';
+  show('s-auth');
+}
+$('auth-swap').onclick=()=>openAuth(authMode==='in');
+$('rail-you').onclick=openYou;
+
+$('auth-go').onclick=async()=>{
+  const handle=$('in-handle').value.trim().toLowerCase();
+  const password=$('in-pass').value;
+  if(!handle || !password){ $('auth-err').textContent='Both, please.'; return; }
+  $('auth-go').textContent='…'; $('auth-err').textContent='';
+  try{
+    await api(authMode==='up' ? '/register' : '/login',
+      {method:'POST', body:JSON.stringify({handle,password})});
+    $('in-handle').value=''; $('in-pass').value='';
+    openYou();
+  }catch(e){
+    $('auth-err').textContent=e.message;
+    $('auth-go').textContent='continue';
+  }
+};
 
 // ── reflection ──────────────────────────────────────────────
 function buildFeelings(){
