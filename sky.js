@@ -151,9 +151,12 @@
 
     // nothing until civil twilight, full dark by -18°
     const night = Math.max(0, Math.min(1, (-sun - 6) / 12));
-    if (night <= 0 || cloud > 0.92) return [];
+    if (night <= 0 || cloud > 0.95) return [];
 
-    const clear = Math.pow(1 - cloud, 1.6);
+    /* Attenuation, not a switch. The old exponent took half cloud down to 30%
+     * — but broken cloud is exactly when you do see the bright ones, and in
+     * England it is most nights. Overcast still means none. */
+    const clear = Math.pow(1 - cloud, 1.15);
     const place = DARKNESS[o.place] != null ? DARKNESS[o.place] : 0.55;
     const limit = 1.9 + place * 3.2;         // faintest magnitude visible here
     const lst = localSiderealDeg(lon, date);
