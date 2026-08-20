@@ -220,5 +220,6 @@
     };
   }
 
+  global.SAHAJ_SEQ_BUILD = '2026-08-20a';
   global.ZenSequencer = { buildPlan, rng, FADE_OUT, BREATH, FADE_IN };
 })(typeof window !== 'undefined' ? window : globalThis);
