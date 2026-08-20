@@ -198,9 +198,13 @@ body{animation:pagein .8s ease both}
 <!-- landing -->
 <section class="screen" id="s-landing">
   <div class="mark">sahaj</div>
-  <a class="meta" href="about.html" style="margin-top:14px;color:var(--faint);
-     text-decoration:none;border-bottom:1px solid var(--rule);
-     align-self:flex-start;padding-bottom:3px">about</a>
+  <div style="margin-top:14px;display:flex;gap:22px;align-self:flex-start">
+    <a class="meta" href="about.html" style="color:var(--faint);
+       text-decoration:none;border-bottom:1px solid var(--rule);
+       padding-bottom:3px">about</a>
+    <span class="meta tap" id="landing-you" style="color:var(--faint);
+       border-bottom:1px solid var(--rule);padding-bottom:3px">you</span>
+  </div>
   <div class="spacer"></div>
   <div class="lede">One piece of music, assembled for this hour.</div>
   <div class="sub">It uses the weather, the time, and where you are.
@@ -308,7 +312,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20a';
+const BUILD = '2026-08-20c';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -1065,6 +1069,7 @@ function openAuth(creating){
 }
 $('auth-swap').onclick=()=>openAuth(authMode==='in');
 $('rail-you').onclick=openYou;
+$('landing-you').onclick=openYou;
 
 $('auth-go').onclick=async()=>{
   const handle=$('in-handle').value.trim().toLowerCase();
