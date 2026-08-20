@@ -312,7 +312,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20d';
+const BUILD = '2026-08-20e';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -1025,7 +1025,10 @@ async function openYou(){
     ['time listened', fmtTime(st.listened_s||0)],
     ['most asked', st.top_mood ? phraseFor(st.top_mood) : '—'],
     ['usual length', st.usual_minutes ? st.usual_minutes+' min' : '—'],
-    ['surroundings', st.top_texture ? labelFor(st.top_texture) : '—'],
+    // how it usually lands — the one line here that says whether this works.
+    // "surroundings" sat here before, but the texture is chosen contextually,
+    // so it reported the weather rather than anything about the listener.
+    ['usually feel', st.top_feeling || '—'],
   ] : [];
 
   body.innerHTML =
