@@ -318,7 +318,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20g';
+const BUILD = '2026-08-20h';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -674,6 +674,7 @@ const BREATH_MS = 5200;   // one full cycle of the dot
  * way left the previous one's minutes and progress on screen while the new one
  * was still drawing breath. */
 function clearSessionScreen(){
+  ending=false;          // whatever became of the last one, this is a new one
   refreshTexture();
   clearInterval(TIMER); TIMER=null;
   clockStart=0; pausedAt=null; muted=false;
@@ -868,7 +869,7 @@ $('go-mute').onclick=()=>{
  * twenty minutes you asked for is still twenty minutes and still ends properly. */
 let rerolls = 0;
 $('go-again').onclick=async()=>{
-  if(!PLAN || !ENGINE) return;
+  if(!PLAN || !ENGINE || ending) return;   // not once the session is ending
   const el = elapsed();
   const leftMin = Math.max(3, Math.round((PLAN.duration - el)/60));
   pausedAt=null; $('go-pause').textContent='pause';
@@ -912,21 +913,30 @@ const REST_AFTER_END = 5200;
 const REST_AFTER_STOP = 2400;
 
 let ending=false;
+/* The clock and the engine both announce the end, so this runs once. But the
+ * flag has to be paired with actually leaving the session screen: when this
+ * threw after setting it, the app was stranded — finish() returned immediately
+ * ever after, so stop and the natural ending both did nothing, while "something
+ * else" (which never checked the flag) carried on working. So the screen change
+ * is scheduled first and everything that can fail is wrapped.
+ *
+ * Every session is asked about, however short. Someone who stopped after forty
+ * seconds is saying something more useful than someone who finished happily. */
 function finish(completed){
-  if(ending) return;      // the clock and the engine both announce it
+  if(ending) return;
   ending=true;
-  clearInterval(TIMER);
-  const played = Math.round(elapsed());
-  // a longer tail when it ends of its own accord; stopping should feel prompt
-  if(ENGINE) ENGINE.stop(completed ? 4.5 : 2.2);
-  saveSession(completed);
 
-  // Every session is asked about, however short. Someone who stopped after
-  // forty seconds is saying something more useful than someone who finished
-  // contentedly, and dropping that on the floor was a mistake.
-  const next = 's-reflect';
   $('s-session').classList.add('receding');
-  setTimeout(()=>show(next), completed ? REST_AFTER_END : REST_AFTER_STOP);
+  setTimeout(()=>show('s-reflect'),
+             completed ? REST_AFTER_END : REST_AFTER_STOP);
+
+  try{
+    clearInterval(TIMER); TIMER=null;
+    // a longer tail when it ends of its own accord; stopping should feel prompt
+    if(ENGINE) ENGINE.stop(completed ? 4.5 : 2.2);
+  }catch(err){ console.warn('sahaj: stopping', err); }
+  try{ saveSession(completed); }
+  catch(err){ console.warn('sahaj: saving', err); }
 }
 
 function sessionBody(completed){
