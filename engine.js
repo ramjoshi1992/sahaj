@@ -322,7 +322,8 @@
       this.onState({ phase: 'playing' });
     }
 
-    stopVoices() {
+    stopVoices(tailS) {
+      const tail = Math.max(0.2, Number(tailS) || 0.35);
       this._timers.forEach(clearTimeout);
       this._timers = [];
       if (!this.ctx) return;
@@ -331,24 +332,28 @@
         try {
           v.gain.gain.cancelScheduledValues(t);
           v.gain.gain.setValueAtTime(Math.max(v.gain.gain.value, 0.0001), t);
-          v.gain.gain.linearRampToValueAtTime(0.0001, t + 0.35);
-          v.src.stop(t + 0.45);
+          v.gain.gain.linearRampToValueAtTime(0.0001, t + tail);
+          v.src.stop(t + tail + 0.1);
         } catch (e) {}
       });
       this._voices = [];
     }
 
-    stop() {
+    /* tailS: how long to take fading out. A session that reaches its own end
+     * deserves a longer one than a session someone stopped. index.html has
+     * been passing this since the rest was written; it was quietly ignored. */
+    stop(tailS) {
+      const tail = Math.max(0.2, Number(tailS) || 0.45);
       this.playing = false;
       if (this._raf && global.cancelAnimationFrame) global.cancelAnimationFrame(this._raf);
-      this.stopVoices();
+      this.stopVoices(tail);
       if (this._texture) {
         try {
           const t = this.ctx.currentTime;
           this.textureBus.gain.cancelScheduledValues(t);
           this.textureBus.gain.setValueAtTime(this.textureBus.gain.value, t);
-          this.textureBus.gain.linearRampToValueAtTime(0.0001, t + 1.2);
-          this._texture.stop(t + 1.4);
+          this.textureBus.gain.linearRampToValueAtTime(0.0001, t + tail);
+          this._texture.stop(t + tail + 0.2);
         } catch (e) {}
         this._texture = null;
       }
