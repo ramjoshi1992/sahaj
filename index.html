@@ -318,7 +318,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20h';
+const BUILD = '2026-08-20i';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -678,6 +678,7 @@ function clearSessionScreen(){
   refreshTexture();
   clearInterval(TIMER); TIMER=null;
   clockStart=0; pausedAt=null; muted=false;
+  sessionStart=0; pausedTotal=0; pauseBegan=0;
   $('bar').style.width='0%';
   $('left').textContent='';
   $('go-pause').textContent='pause';
@@ -735,6 +736,7 @@ $('go-play').onclick=async()=>{
 
     $('breath').classList.remove('on');
     await ENGINE.start(0);
+    sessionStart = performance.now()/1000;   // once per session, not per plan
     startClock();
   }catch(e){
     $('breath').classList.remove('on');
@@ -756,10 +758,27 @@ function setTexLabel(){
   $('tex-label').textContent = f ? (f.label||choice.texture)
     : (LIB._textures.noneLabel||'quiet');
 }
+/* Two different clocks, and conflating them was a bug.
+ *
+ * elapsed() is the CURRENT PLAN's clock — it drives the progress bar and the
+ * minutes remaining, and a reroll resets it because the reroll starts a new
+ * plan for the time that is left.
+ *
+ * listened() is the WHOLE SESSION, rerolls and pauses included. It is what
+ * gets saved. Using elapsed() for that meant a twenty minute session with a
+ * reroll near the end recorded four minutes: everything before the last
+ * "something else" was thrown away. */
 let clockStart=0, pausedAt=null;
+let sessionStart=0, pausedTotal=0, pauseBegan=0;
+
 function elapsed(){
   if(pausedAt!==null) return pausedAt;
   return clockStart ? performance.now()/1000 - clockStart : 0;
+}
+function listened(){
+  if(!sessionStart) return 0;
+  const paused = pausedTotal + (pauseBegan ? performance.now()/1000 - pauseBegan : 0);
+  return Math.max(0, performance.now()/1000 - sessionStart - paused);
 }
 function startClock(){
   const total=PLAN.duration;
@@ -844,12 +863,14 @@ $('go-pause').onclick=async()=>{
   if(!ENGINE || !ENGINE.ctx) return;
   if(pausedAt===null){
     pausedAt = elapsed();
+    pauseBegan = performance.now()/1000;
     await ENGINE.pause();
     $('go-pause').textContent='resume';
     $('left').textContent='paused';
   } else {
     await ENGINE.resume();
     clockStart = performance.now()/1000 - pausedAt;
+    if(pauseBegan){ pausedTotal += performance.now()/1000 - pauseBegan; pauseBegan=0; }
     pausedAt = null;
     $('go-pause').textContent='pause';
   }
@@ -945,7 +966,7 @@ function sessionBody(completed){
     plan_seed:PLAN?PLAN.seed:0, texture:choice.texture||null,
     bed_offset_db:choice.offset||0,
     rerolls:rerolls||0,
-    played_s: Math.round(elapsed()),
+    played_s: Math.round(listened()),   // the whole session, not the last plan
     completed:!!completed
   });
 }
