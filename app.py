@@ -148,9 +148,18 @@ def me():
 @app.post("/sessions")
 def save_session():
     """
-    Written once, when a session ends. mood, tier, minutes and plan_seed
-    reproduce the entire arrangement later, so nothing about the plan is kept.
-    Accepts a beacon on tab close, hence the lenient body parsing.
+    Written when a session STARTS, and updated as it goes.
+
+    It used to be written once at the end, to avoid rows from people who
+    wandered off. That was the wrong trade: the commonest use is falling asleep
+    to it, and on a locked phone the main thread is frozen — the audio plays on
+    from the audio thread, but nothing ever runs to record that it finished. If
+    the tab is discarded before the phone is unlocked, the session vanished
+    entirely. A row with played_s 0 is a smaller problem than a whole night's
+    sleep session going unrecorded.
+
+    mood, tier, minutes and plan_seed reproduce the entire arrangement later,
+    so nothing about the plan itself is kept.
     """
     d = request.get_json(silent=True, force=True) or {}
     mood, tier = d.get("mood"), d.get("tier")
@@ -182,6 +191,45 @@ def save_session():
              texture, offset, played, bool(d.get("completed")), rerolls))
         sid = cur.fetchone()["id"]
     return jsonify(session_id=sid), 201
+
+
+@app.post("/sessions/<int:sid>/progress")
+def session_progress(sid):
+    """
+    How far a session got. Called on the screen locking, on pause, and when it
+    ends — whichever the device allows. Sent by beacon where possible, so the
+    body parsing is lenient and it never returns anything worth waiting for.
+
+    Monotonic on purpose: a later call cannot reduce played_s or un-complete a
+    session. A beacon fired as the phone locks would otherwise overwrite the
+    true figure recorded when the session actually finished.
+    """
+    d = request.get_json(silent=True, force=True) or {}
+    try:
+        played = max(0, int(d.get("played_s") or 0))
+    except (TypeError, ValueError):
+        played = 0
+    completed = bool(d.get("completed"))
+    try:
+        rerolls = max(0, min(50, int(d.get("rerolls") or 0)))
+    except (TypeError, ValueError):
+        rerolls = 0
+    offset = float(d.get("bed_offset_db") or 0)
+    texture = d.get("texture") or None
+
+    with db() as c, c.cursor() as cur:
+        cur.execute(
+            "UPDATE sessions SET "
+            "  played_s = GREATEST(played_s, %s), "
+            "  completed = (completed OR %s), "
+            "  rerolls = GREATEST(rerolls, %s), "
+            "  bed_offset_db = %s, "
+            "  texture = COALESCE(%s, texture) "
+            "WHERE id = %s RETURNING id",
+            (played, completed, rerolls, offset, texture, sid))
+        if not cur.fetchone():
+            return jsonify(error="no such session"), 404
+    return jsonify(ok=True)
 
 
 @app.post("/sessions/<int:sid>/reflection")
