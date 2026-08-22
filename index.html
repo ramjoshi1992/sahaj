@@ -215,6 +215,10 @@ body{animation:pagein .8s ease both}
   <div class="lede">One piece of music, assembled for this hour.</div>
   <div class="sub">It uses the weather, the time, and where you are.
     It never assembles the same way twice.</div>
+  <div class="sub" id="why-location" style="display:none;color:var(--faint);
+       max-width:29ch;font-size:13px;margin-top:13px">It will ask where you are.
+    That is only to work out your sky and your weather — the coordinates go to a
+    weather service and nowhere else, and nothing is stored.</div>
   <div class="spacer"></div>
   <div class="act" id="go-begin">begin</div>
   <div class="meta" id="landing-note" style="margin-top:17px">no account needed</div>
@@ -318,7 +322,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20j';
+const BUILD = '2026-08-21c';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -414,15 +418,70 @@ function guessSky(){
   if(s && Date.now()-s.at < 3*3600*1000) return {cloud:s.cloud, precip:s.precip};
   return null;
 }
+/* Where to draw the sky when we are not allowed to know.
+ *
+ * The timezone NAME is available without any permission and is far better than
+ * the offset: Europe/London is a place, UTC+1 in August is a guess that lands
+ * in Poland. A remembered position beats both.
+ *
+ * These are deliberately coarse — a capital or a large city per zone. The sky
+ * only needs to be right to a degree or so, and the weather for a region is
+ * closer than the weather for the wrong country. */
+const ZONE_PLACES = {
+  'Europe/London':[51.5,-0.1], 'Europe/Dublin':[53.3,-6.2],
+  'Europe/Paris':[48.9,2.4], 'Europe/Madrid':[40.4,-3.7],
+  'Europe/Lisbon':[38.7,-9.1], 'Europe/Berlin':[52.5,13.4],
+  'Europe/Amsterdam':[52.4,4.9], 'Europe/Brussels':[50.8,4.4],
+  'Europe/Rome':[41.9,12.5], 'Europe/Zurich':[47.4,8.5],
+  'Europe/Vienna':[48.2,16.4], 'Europe/Prague':[50.1,14.4],
+  'Europe/Warsaw':[52.2,21.0], 'Europe/Stockholm':[59.3,18.1],
+  'Europe/Oslo':[59.9,10.8], 'Europe/Copenhagen':[55.7,12.6],
+  'Europe/Helsinki':[60.2,24.9], 'Europe/Athens':[38.0,23.7],
+  'Europe/Istanbul':[41.0,29.0], 'Europe/Moscow':[55.8,37.6],
+  'Asia/Kolkata':[19.1,72.9], 'Asia/Calcutta':[19.1,72.9],
+  'Asia/Karachi':[24.9,67.0], 'Asia/Dhaka':[23.8,90.4],
+  'Asia/Colombo':[6.9,79.9], 'Asia/Kathmandu':[27.7,85.3],
+  'Asia/Dubai':[25.2,55.3], 'Asia/Riyadh':[24.7,46.7],
+  'Asia/Jerusalem':[31.8,35.2], 'Asia/Singapore':[1.35,103.8],
+  'Asia/Bangkok':[13.8,100.5], 'Asia/Jakarta':[-6.2,106.8],
+  'Asia/Manila':[14.6,121.0], 'Asia/Hong_Kong':[22.3,114.2],
+  'Asia/Shanghai':[31.2,121.5], 'Asia/Tokyo':[35.7,139.7],
+  'Asia/Seoul':[37.6,127.0], 'Asia/Taipei':[25.0,121.6],
+  'Australia/Sydney':[-33.9,151.2], 'Australia/Melbourne':[-37.8,145.0],
+  'Australia/Brisbane':[-27.5,153.0], 'Australia/Perth':[-31.95,115.9],
+  'Pacific/Auckland':[-36.9,174.8],
+  'America/New_York':[40.7,-74.0], 'America/Toronto':[43.7,-79.4],
+  'America/Chicago':[41.9,-87.6], 'America/Denver':[39.7,-105.0],
+  'America/Los_Angeles':[34.1,-118.2], 'America/Vancouver':[49.3,-123.1],
+  'America/Phoenix':[33.4,-112.1], 'America/Mexico_City':[19.4,-99.1],
+  'America/Sao_Paulo':[-23.6,-46.6], 'America/Bogota':[4.7,-74.1],
+  'America/Buenos_Aires':[-34.6,-58.4], 'America/Santiago':[-33.4,-70.7],
+  'Africa/Cairo':[30.0,31.2], 'Africa/Lagos':[6.5,3.4],
+  'Africa/Nairobi':[-1.3,36.8], 'Africa/Johannesburg':[-26.2,28.0],
+  'Africa/Casablanca':[33.6,-7.6],
+};
+
 function guessPosition(){
-  // Somewhere to start before anything has resolved. A remembered position is
-  // exact; failing that, longitude follows from the clock's offset and the
-  // latitude is a guess. Nothing but the sky depends on it.
   const last = store.get('pos');
   if(last) return {lat:last.lat, lon:last.lon, guessed:false, remembered:true};
-  const lon = -new Date().getTimezoneOffset()/4;
+
+  try{
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const p = ZONE_PLACES[zone];
+    if(p) return {lat:p[0], lon:p[1], guessed:true, zone:zone};
+  }catch(e){}
+
+  /* Last resort: longitude from the timezone offset, using STANDARD time
+   * rather than whatever is in force today. Britain sits at 0° but runs on BST
+   * in summer, so reading the current offset put this at 15°E — eastern
+   * Germany — and fetched that weather instead. */
+  const y = new Date().getFullYear();
+  const std = Math.max(new Date(y,0,1).getTimezoneOffset(),
+                       new Date(y,6,1).getTimezoneOffset());
+  const lon = -std/4;
   return {lat:51.5, lon:Math.max(-180,Math.min(180,lon)), guessed:true};
 }
+
 function position(){
   return new Promise(res=>{
     if(!navigator.geolocation) return res(guessPosition());
@@ -464,7 +523,7 @@ async function weather(lat,lon){
    * service looks more accurate — not because its data is better. */
   const url='https://api.open-meteo.com/v1/forecast'
     +`?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}`
-    +'&current=cloud_cover,precipitation,weather_code'
+    +'&current=cloud_cover,cloud_cover_low,cloud_cover_mid,precipitation,weather_code'
     +'&minutely_15=precipitation'
     +'&daily=sunrise,sunset&timezone=auto&forecast_days=1';
   const r=await fetch(url);
@@ -492,8 +551,14 @@ async function weather(lat,lon){
     ? (now15>=0.1 || (heavy && now15>0))
     : (hourly>=0.4 && heavy);
 
+  /* Two different figures. Total cloud is what blocks starlight, cirrus
+   * included. Low and mid cloud is what makes a day look grey — thin cirrus at
+   * thirty thousand feet counts as cover but reads as clear blue from the
+   * ground, which is why a sunny morning was being called overcast. */
+  const low = Math.max(j.current.cloud_cover_low||0, j.current.cloud_cover_mid||0)/100;
   return {
     cloud:(j.current.cloud_cover||0)/100,
+    grey: low,
     // what the sky looks like: gentler, since this only tints the gradient
     precip: Math.min(1, (now15!==null ? now15*4 : hourly)/2.5),
     falling,                    // what we say and what changes the music
@@ -549,26 +614,26 @@ function suggestTexture(w,place){
 }
 
 // ── boot ────────────────────────────────────────────────────
-(async function boot(){
-  show('s-landing');
+/* Asking without explaining is how permission gets declined. The browser's own
+ * prompt cannot be changed, but when it appears can be — and firing it the
+ * instant the page loads, before anyone has read what this is, is the worst
+ * possible moment. So the landing says why, and the prompt waits for "begin". */
+async function permissionState(){
+  try{
+    if(!navigator.permissions) return 'prompt';
+    const p = await navigator.permissions.query({name:'geolocation'});
+    return p.state;                       // granted | denied | prompt
+  }catch(e){ return 'prompt'; }
+}
 
-  /* The sky is painted before anything is awaited. Waiting on the library and
-   * on geolocation put it two or three seconds behind the page, which is long
-   * enough to look like a fault rather than a night arriving. */
-  const first = guessPosition();
-  CTX.lat=first.lat; CTX.lon=first.lon; CTX.guessed=first.guessed;
-  const lastSky = guessSky();
-  CTX.cloud = lastSky ? lastSky.cloud : 0;
-  CTX.precip = lastSky ? lastSky.precip : 0;
-  CTX.skyKnown = !!lastSky;      // stars only once we know what the sky is doing
-  paintSky();
-
-  const libP = fetch('library.json').then(r=>r.json())
-                 .then(j=>{ LIB=j; }).catch(()=>{ LIB=null; });
+let contextResolved=false;
+async function resolveContext(){
+  if(contextResolved) return;
+  contextResolved=true;
 
   const p = await position();
   const moved = Math.abs(p.lat-CTX.lat)>0.4 || Math.abs(p.lon-CTX.lon)>0.4;
-  CTX.lat=p.lat; CTX.lon=p.lon; CTX.guessed=p.guessed;
+  CTX.lat=p.lat; CTX.lon=p.lon; CTX.guessed=p.guessed; CTX.zone=p.zone;
   if(!p.guessed) store.set('pos',{lat:p.lat, lon:p.lon});
   if(moved) paintSky();
 
@@ -577,27 +642,53 @@ function suggestTexture(w,place){
     CTX.cloud=w.cloud; CTX.precip=w.precip; CTX.w=w; CTX.skyKnown=true;
     // the about page has no weather of its own; without this it draws a
     // permanently clear sky and shows stars on a night that has none
-    store.set('sky',{cloud:w.cloud, precip:w.precip, at:Date.now()});
+    store.set('sky',{cloud:w.cloud, grey:w.grey, precip:w.precip, at:Date.now()});
   }catch(e){
     const last=guessSky();
     CTX.cloud = last ? last.cloud : 0;
     CTX.precip = last ? last.precip : 0;
-    // no forecast and nothing remembered: leave the stars out rather than
-    // guess at a clear sky
     CTX.skyKnown = !!last;
   }
-  await libP;
   CTX.place = p.guessed ? 'suburban' : await environment(CTX.lat,CTX.lon);
   CTX.tier = tierFor(CTX.w);
   paintSky();
+  refreshTexture();
+  buildEntry();                 // the context line, now that it is true
+}
+
+(async function boot(){
+  show('s-landing');
+
+  /* The sky is painted before anything is awaited. Waiting on the library and
+   * on geolocation put it two or three seconds behind the page, which is long
+   * enough to look like a fault rather than a night arriving. */
+  const first = guessPosition();
+  CTX.lat=first.lat; CTX.lon=first.lon; CTX.guessed=first.guessed;
+  CTX.zone=first.zone;
+  const lastSky = guessSky();
+  CTX.cloud = lastSky ? lastSky.cloud : 0;
+  CTX.precip = lastSky ? lastSky.precip : 0;
+  CTX.skyKnown = !!lastSky;      // stars only once we know what the sky is doing
+  paintSky();
   setInterval(paintSky, 60000);
 
-  refreshTexture();
+  const libP = fetch('library.json').then(r=>r.json())
+                 .then(j=>{ LIB=j; }).catch(()=>{ LIB=null; });
 
+  CTX.tier = tierFor(null);      // by the clock, until the weather is known
+  refreshTexture();
   buildEntry();
   buildDurations();
   buildFeelings();
   whoAmI();
+  await libP;
+
+  const state = await permissionState();
+  if(state==='granted' || store.get('pos')){
+    resolveContext();            // no prompt will appear; just do it
+  } else if(state==='prompt'){
+    $('why-location').style.display='block';
+  }
 })();
 
 /* Hold the navigation just long enough for the page to go. */
@@ -644,13 +735,18 @@ function buildEntry(){
     $('more').classList.add('hidden');
   };
   const when = new Date().toLocaleDateString('en-GB',{weekday:'long'});
+  const g = (CTX.w && CTX.w.grey != null) ? CTX.w.grey : CTX.cloud;
   const sky = (CTX.w && CTX.w.falling) ? 'rain'
-            : CTX.cloud>0.65 ? 'overcast'
-            : CTX.cloud>0.25 ? 'some cloud' : 'clear';
+            : g>0.75 ? 'overcast'
+            : g>0.40 ? 'some cloud'
+            : g>0.15 ? 'a little cloud' : 'clear';
   $('context').textContent = `${when} ${CTX.phase==='night'?'night':
     new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening'} · ${sky}`;
 }
-$('go-begin').onclick=()=>show('s-entry');
+$('go-begin').onclick=()=>{
+  show('s-entry');
+  resolveContext();      // the prompt lands here, after they have read why
+};
 
 // ── duration ────────────────────────────────────────────────
 function buildDurations(){
