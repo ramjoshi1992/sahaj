@@ -318,7 +318,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-20i';
+const BUILD = '2026-08-20j';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -738,6 +738,7 @@ $('go-play').onclick=async()=>{
     await ENGINE.start(0);
     sessionStart = performance.now()/1000;   // once per session, not per plan
     startClock();
+    openSession();
   }catch(e){
     $('breath').classList.remove('on');
     $('go-play').textContent='begin';
@@ -956,7 +957,7 @@ function finish(completed){
     // a longer tail when it ends of its own accord; stopping should feel prompt
     if(ENGINE) ENGINE.stop(completed ? 4.5 : 2.2);
   }catch(err){ console.warn('sahaj: stopping', err); }
-  try{ saveSession(completed); }
+  try{ saveProgress(completed, false); }
   catch(err){ console.warn('sahaj: saving', err); }
 }
 
@@ -971,31 +972,66 @@ function sessionBody(completed){
   });
 }
 let pendingFeeling=null;
-function saveSession(completed){
+
+/* The row is created when the music starts, and moved forward whenever the
+ * device lets us — on the screen locking, on pause, and at the end.
+ *
+ * Writing it once at the end was cleaner but lost the sessions that matter
+ * most: someone falls asleep, the phone locks, the main thread freezes, and
+ * although the audio plays on from the audio thread there is nothing left
+ * running to record that it finished. If the tab is dropped before they wake,
+ * the whole session disappeared. */
+function openSession(){
   if(!PLAN) return;
-  const body=sessionBody(completed);
   fetch(API+'/sessions',{method:'POST',credentials:'include',
-    headers:{'Content-Type':'application/json'},body})
+    headers:{'Content-Type':'application/json'},body:sessionBody(false)})
     .then(r=>r.json()).then(j=>{
       sessionRow=j.session_id;
-      // the server may have been asleep — a free instance takes about a
-      // minute to wake, which is longer than it takes to answer one question
       if(pendingFeeling){ postFeeling(pendingFeeling); pendingFeeling=null; }
     })
     .catch(()=>{});
 }
+
+function progressBody(completed){
+  return JSON.stringify({
+    played_s: Math.round(listened()),
+    completed: !!completed,
+    rerolls: rerolls||0,
+    bed_offset_db: choice.offset||0,
+    texture: choice.texture||null
+  });
+}
+
+/* beacon: survives the page being frozen or closed, which a fetch does not */
+function saveProgress(completed, beacon){
+  if(!sessionRow || !PLAN) return;
+  const url=API+'/sessions/'+sessionRow+'/progress';
+  const body=progressBody(completed);
+  if(beacon && navigator.sendBeacon){
+    try{ navigator.sendBeacon(url, new Blob([body],{type:'application/json'}));
+         return; }catch(e){}
+  }
+  fetch(url,{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},body}).catch(()=>{});
+}
+
 function postFeeling(f){
   if(!sessionRow) return;
   fetch(API+'/sessions/'+sessionRow+'/reflection',{method:'POST',
     credentials:'include',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({feeling:f})}).catch(()=>{});
 }
-// closing the tab still counts
-window.addEventListener('pagehide',()=>{
-  if(PLAN && TIMER){ clearInterval(TIMER);
-    try{ navigator.sendBeacon(API+'/sessions',
-      new Blob([sessionBody(false)],{type:'application/json'})); }catch(e){}
+/* The screen locking fires this before the page is frozen — the last moment
+ * anything of ours is guaranteed to run. The server only ever moves a session
+ * forward, so a beacon sent at lock time cannot undo the true figure written
+ * when the session actually finished. */
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden' && PLAN && sessionRow && !ending){
+    saveProgress(false, true);
   }
+});
+window.addEventListener('pagehide',()=>{
+  if(PLAN && sessionRow && !ending) saveProgress(false, true);
 });
 
 // ── you ─────────────────────────────────────────────────────
