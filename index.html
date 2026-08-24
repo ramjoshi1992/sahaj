@@ -322,7 +322,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-21c';
+const BUILD = '2026-08-21d';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -499,7 +499,13 @@ function position(){
 /* Environment type, cached hard. Where someone lives does not change, and
  * Nominatim asks that it not be hammered. */
 async function environment(lat,lon){
-  const key='env.'+lat.toFixed(2)+','+lon.toFixed(2);
+  /* env2: the earlier version read a "suburb" field as meaning suburban. But
+   * Nominatim uses suburb for an administrative subdivision of a city — the
+   * middle of Birmingham sits in one called City Centre — so the more central
+   * you were, the more likely it was to call you suburban. The place hierarchy
+   * is the signal: city is urban whatever subdivision you are in, town is
+   * suburban, village or hamlet is rural. */
+  const key='env2.'+lat.toFixed(2)+','+lon.toFixed(2);
   const hit=store.get(key); if(hit) return hit;
   try{
     const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=json'+
@@ -507,10 +513,17 @@ async function environment(lat,lon){
       {headers:{'Accept':'application/json'}});
     const j=await r.json();
     const a=j.address||{};
-    let place='suburban';
-    if(a.city||a.town) place = a.suburb||a.neighbourhood ? 'suburban' : 'urban';
-    if(a.village||a.hamlet||a.farm) place='rural';
-    if(/beach|coast|sea|bay/i.test(j.display_name||'')) place='coastal';
+
+    let place;
+    if(a.village || a.hamlet || a.farm || a.isolated_dwelling) place='rural';
+    else if(a.city)  place='urban';
+    else if(a.town)  place='suburban';
+    else if(a.suburb || a.neighbourhood || a.borough) place='suburban';
+    else if(a.municipality) place='suburban';
+    else place='rural';                       // no settlement named at all
+
+    if(/beach|coast|sea|bay|harbour|harbor/i.test(j.display_name||''))
+      place='coastal';
     store.set(key,place);
     return place;
   }catch(e){ return 'suburban'; }
