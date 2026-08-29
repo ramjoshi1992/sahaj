@@ -305,13 +305,19 @@ def stats():
                                total=d["total"]))
         landed.sort(key=lambda x: -x["total"])
 
-        # asked for, against stayed for
-        cur.execute(f"SELECT avg(minutes)::float asked, "
-                    f"       avg(played_s)::float / 60 stayed, count(*) n "
-                    f"FROM sessions WHERE {where}", (arg,))
+        # Asked for, against stayed for — at the length they actually choose.
+        # Averaging the chosen minutes produced "you usually ask for 21
+        # minutes", which is not one of the four options and reads as nonsense;
+        # and averaging the stay across 10s, 20s and 30s together compares
+        # figures that have nothing to do with each other.
+        cur.execute(f"SELECT minutes, count(*) n, "
+                    f"       avg(played_s)::float / 60 stayed "
+                    f"FROM sessions WHERE {where} "
+                    f"GROUP BY minutes ORDER BY n DESC, minutes DESC LIMIT 1",
+                    (arg,))
         r = cur.fetchone()
-        staying = dict(asked=round(r["asked"] or 0, 1),
-                       stayed=round(r["stayed"] or 0, 1), n=r["n"])
+        staying = (dict(asked=r["minutes"], stayed=round(r["stayed"] or 0, 1),
+                        n=r["n"]) if r else dict(asked=0, stayed=0, n=0))
 
     return jsonify(sessions=t["n"], listened_s=int(t["s"]), top_mood=mood,
                    usual_minutes=mins, top_feeling=feeling,
