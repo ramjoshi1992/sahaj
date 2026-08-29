@@ -322,7 +322,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-21d';
+const BUILD = '2026-08-21e';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -1256,9 +1256,11 @@ function whatLands(landed){
   return '<div class="meta" style="margin-top:32px">what lands</div>'+lines;
 }
 
+/* The length actually chosen, not an average of the four options — averaging
+ * them gave "you usually ask for 21 minutes", which nobody can ask for. */
 function staying(s){
   if(!s || s.n < MIN_TO_SAY) return '';
-  const asked=Math.round(s.asked), stayed=Math.round(s.stayed);
+  const asked=s.asked, stayed=Math.round(s.stayed);
   if(!asked) return '';
   // said plainly either way — finishing is not a score to beat
   const line = stayed >= asked - 1
