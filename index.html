@@ -322,7 +322,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-21e';
+const BUILD = '2026-08-21f';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -778,6 +778,27 @@ function buildDurations(){
 // ── playing ─────────────────────────────────────────────────
 const BREATH_MS = 5200;   // one full cycle of the dot
 
+/* Which family opened this mood last time, so the next session does not begin
+ * with the same seed track.
+ *
+ * Every session opens with a seed played from its beginning, and there are only
+ * three per group — so asking for the same mood twice had a one in three chance
+ * of starting withbyte-identical audio. That reads as "it played me the same
+ * thing", whatever happens afterwards.
+ *
+ * Kept locally rather than on the server: it is one letter per mood, it works
+ * signed out, and it costs no request at the moment a session starts — which is
+ * exactly when a sleeping server would be felt. */
+function lastOpener(key){
+  const h = store.get('opened', {});
+  return h[key] || null;
+}
+function rememberOpener(key, fam){
+  const h = store.get('opened', {});
+  h[key] = fam;
+  store.set('opened', h);
+}
+
 /* Everything the session screen shows, back to nothing. This used to live only
  * in reset(), which runs after the reflection — so starting a session any other
  * way left the previous one's minutes and progress on screen while the new one
@@ -817,8 +838,10 @@ $('home').onclick=()=>{
 $('go-play').onclick=async()=>{
   if(!LIB){ $('go-play').textContent='library unavailable'; return; }
   try{
+    const key = choice.mood+'/'+CTX.tier;
     PLAN = ZenSequencer.buildPlan(LIB,{mood:choice.mood, tier:CTX.tier,
-      minutes:choice.minutes});
+      minutes:choice.minutes, avoid:lastOpener(key)});
+    rememberOpener(key, PLAN.order[0]);
     ENGINE = new ZenEngine({
       onSegment:()=>{},
       onLog:(m,c)=>{ if(c==='err') console.warn('sahaj:',m); },
@@ -1016,6 +1039,7 @@ $('go-again').onclick=async()=>{
     const wasOpenedBy = PLAN.order[0];
     PLAN = ZenSequencer.buildPlan(LIB,{mood:choice.mood, tier:CTX.tier,
       minutes:leftMin, avoid:wasOpenedBy, warmStart:true});
+    rememberOpener(choice.mood+'/'+CTX.tier, PLAN.order[0]);
     ENGINE = new ZenEngine({onSegment:()=>{},
       onLog:(m,c)=>{ if(c==='err') console.warn('sahaj:',m); },
       onState:st=>{ if(st.phase==='complete') finish(true); }});
