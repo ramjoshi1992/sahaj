@@ -322,7 +322,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-21f';
+const BUILD = '2026-08-21g';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -696,12 +696,18 @@ async function resolveContext(){
   whoAmI();
   await libP;
 
+  /* Nothing asks for location here — not even when the permission looks like
+   * it has already been given. Reading the permission state is not a reliable
+   * promise that no prompt will appear: Chrome and Android's own location
+   * service can disagree, a permission can be cleared while a position stays
+   * remembered, and either way the prompt lands before the landing screen has
+   * been read, which is the thing we were trying to avoid.
+   *
+   * There is no cost to waiting. A returning visitor already has an accurate
+   * remembered position, so the sky is right regardless, and the request costs
+   * exactly the same when it happens on the tap. */
   const state = await permissionState();
-  if(state==='granted' || store.get('pos')){
-    resolveContext();            // no prompt will appear; just do it
-  } else if(state==='prompt'){
-    $('why-location').style.display='block';
-  }
+  if(state !== 'granted') $('why-location').style.display='block';
 })();
 
 /* Hold the navigation just long enough for the page to go. */
