@@ -55,7 +55,21 @@ MOODS = {"happy", "kickstart", "unmotivated", "focus",
          "anxious", "socially-drained", "sleepy"}
 TIERS = {"energetic", "balanced", "mellow"}
 MINUTES = {10, 20, 30, 45}
-FEELINGS = {"settled", "lighter", "clearer", "much the same"}
+# Mirrors the per-mood sets in index.html. Validated as a union rather than
+# per mood: the reflection arrives with a session id, not a mood, and tying the
+# two together here would reject a perfectly good answer if the two files ever
+# drift. "much the same" is common to every mood on purpose — it is what makes
+# the shift rate comparable across them.
+FEELINGS = {
+    "awake", "moving", "brighter",
+    "lighter", "warmer",
+    "ready", "clearer", "started",
+    "focused", "quieter",
+    "settled", "calmer", "steadier",
+    "restored", "more myself",
+    "sleepy", "heavier", "drifting",
+    "much the same",
+}
 
 
 def db():
