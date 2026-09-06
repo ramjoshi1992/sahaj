@@ -322,7 +322,7 @@ body{animation:pagein .8s ease both}
 /* Which build is actually running. Type sahajBuild in the console — if it is
  * not the one you just uploaded, the browser or the host is serving a cached
  * copy and nothing you changed is live. */
-const BUILD = '2026-08-21g';
+const BUILD = '2026-08-21h';
 window.sahajBuild = BUILD;
 console.log('sahaj build', BUILD);
 const API = 'https://lull-h6bd.onrender.com';
@@ -340,7 +340,24 @@ const MOODS = [
   {mood:'sleepy',           phrase:'sleep',               word:'drifting'},
 ];
 const DURATIONS = [10,20,30,45];
-const FEELINGS = ['settled','lighter','clearer','much the same'];
+
+/* What to ask afterwards, in the terms the person asked in. One set for all
+ * seven moods meant asking someone who came here to sleep whether they felt
+ * "clearer", which is nearly a category error.
+ *
+ * "much the same" is the last option everywhere, deliberately: it is what makes
+ * the shift rate comparable between moods, and a reflection that cannot report
+ * nothing is worthless. */
+const FEELINGS = {
+  kickstart:          ['awake','moving','brighter','much the same'],
+  happy:              ['brighter','lighter','warmer','much the same'],
+  unmotivated:        ['ready','clearer','started','much the same'],
+  focus:              ['clearer','focused','quieter','much the same'],
+  anxious:            ['settled','calmer','steadier','much the same'],
+  'socially-drained': ['restored','lighter','more myself','much the same'],
+  sleepy:             ['sleepy','heavier','drifting','much the same'],
+};
+const FEELINGS_ANY = [...new Set(Object.values(FEELINGS).flat())];
 
 const $ = id => document.getElementById(id);
 const store = {
@@ -857,6 +874,7 @@ $('go-play').onclick=async()=>{
     // the session screen is already behind the breath, so the music arrives
     // into a settled screen rather than one that jumps
     clearSessionScreen();
+    buildFeelings();               // the words depend on what was asked for
     $('s-word').textContent=choice.word;
     setTexLabel();
     show('s-session');
@@ -1365,7 +1383,8 @@ $('auth-go').onclick=async()=>{
 // ── reflection ──────────────────────────────────────────────
 function buildFeelings(){
   const box=$('feelings'); box.innerHTML='';
-  FEELINGS.forEach(f=>{
+  const set = FEELINGS[choice.mood] || FEELINGS.anxious;
+  set.forEach(f=>{
     const d=document.createElement('div');
     d.className='phrase'; d.textContent=f;
     d.onclick=()=>{
